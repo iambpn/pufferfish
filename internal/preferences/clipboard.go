@@ -10,11 +10,19 @@ const (
 	prefKeyRecentItems  = "clipboard.recentItems"
 )
 
+// MinRecentItems and MaxRecentItems bound the number of items the history
+// keeps.
+const (
+	MinRecentItems = 1
+	MaxRecentItems = 100
+)
+
 const defaultRecentItems = 20
 
 // ClipboardPreferences holds the clipboard settings shown in the
 // preferences window. Every setter writes through to the app's persistent
-// preference store, so changes survive a restart.
+// preference store, so changes survive a restart, and notifies the
+// registered listeners so the running app follows the new setting at once.
 type ClipboardPreferences struct {
 	UseClipboard bool
 	AddImages    bool
@@ -22,7 +30,8 @@ type ClipboardPreferences struct {
 	AutoPaste    bool
 	RecentItems  int
 
-	store fyne.Preferences
+	store     fyne.Preferences
+	listeners []func()
 }
 
 // LoadClipboardPreferences reads the saved clipboard preferences, falling
@@ -39,27 +48,45 @@ func LoadClipboardPreferences(a fyne.App) *ClipboardPreferences {
 	}
 }
 
+// AddListener registers fn to run after any preference changes. Listeners
+// are expected to re-apply the whole set, so they stay correct whichever
+// setting moved.
+func (p *ClipboardPreferences) AddListener(fn func()) {
+	p.listeners = append(p.listeners, fn)
+}
+
+func (p *ClipboardPreferences) notify() {
+	for _, fn := range p.listeners {
+		fn()
+	}
+}
+
 func (p *ClipboardPreferences) SetUseClipboard(v bool) {
 	p.UseClipboard = v
 	p.store.SetBool(prefKeyUseClipboard, v)
+	p.notify()
 }
 
 func (p *ClipboardPreferences) SetAddImages(v bool) {
 	p.AddImages = v
 	p.store.SetBool(prefKeyAddImages, v)
+	p.notify()
 }
 
 func (p *ClipboardPreferences) SetKeepContent(v bool) {
 	p.KeepContent = v
 	p.store.SetBool(prefKeyKeepContent, v)
+	p.notify()
 }
 
 func (p *ClipboardPreferences) SetAutoPaste(v bool) {
 	p.AutoPaste = v
 	p.store.SetBool(prefKeyAutoPaste, v)
+	p.notify()
 }
 
 func (p *ClipboardPreferences) SetRecentItems(v int) {
 	p.RecentItems = v
 	p.store.SetInt(prefKeyRecentItems, v)
+	p.notify()
 }

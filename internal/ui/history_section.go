@@ -19,13 +19,17 @@ var dividerColor = color.NRGBA{R: 128, G: 128, B: 128, A: 60}
 // header with a "Clear all" action and a close button, and a scrollable
 // list of captured items rendered as cards, or a placeholder when the
 // history is empty.
-func NewHistorySection(store *clipboard.Store, onSelect func(clipboard.Item), onClose func()) fyne.CanvasObject {
+//
+// The section follows the store while it is open, so items copied while the
+// flyout is showing appear straight away. The returned detach function
+// unsubscribes it and must be called when the window closes.
+func NewHistorySection(store *clipboard.Store, onSelect func(clipboard.Item), onClose func()) (content fyne.CanvasObject, detach func()) {
 	placeholder := widget.NewLabel("Clipboard history is empty")
 	placeholder.Alignment = fyne.TextAlignCenter
 
-	var updateEmptyState func()
-	list := newHistoryList(store, onSelect, func() { updateEmptyState() })
-	updateEmptyState = func() {
+	list := newHistoryList(store, onSelect)
+	refresh := func() {
+		list.Refresh()
 		if len(store.Items()) == 0 {
 			placeholder.Show()
 			list.Hide()
@@ -34,20 +38,18 @@ func NewHistorySection(store *clipboard.Store, onSelect func(clipboard.Item), on
 			list.Show()
 		}
 	}
-	updateEmptyState()
+	refresh()
+	detach = store.AddListener(refresh)
 
-	titleRow := newTitleRow(onClose, func() {
-		store.Clear()
-		list.Refresh()
-		updateEmptyState()
-	})
+	titleRow := newTitleRow(onClose, store.Clear)
 	dividerRow := newDividerRow()
 
-	return container.NewBorder(
+	content = container.NewBorder(
 		container.NewVBox(titleRow, dividerRow),
 		nil, nil, nil,
 		container.NewStack(list, container.NewCenter(placeholder)),
 	)
+	return content, detach
 }
 
 // newTitleRow builds the "Clipboard" header with a "Clear all" action and a
@@ -72,23 +74,24 @@ func newDividerRow() fyne.CanvasObject {
 
 // newHistoryList builds the scrollable list of captured items rendered as
 // cards, wired to copy an item on tap and delete it via its delete button.
-// onChange is called after an item is removed, so callers can react to the
-// list becoming empty.
-func newHistoryList(store *clipboard.Store, onSelect func(clipboard.Item), onChange func()) *widget.List {
-	var list *widget.List
-	list = widget.NewList(
+// Removing an item notifies the store, which refreshes the list through the
+// section's listener.
+func newHistoryList(store *clipboard.Store, onSelect func(clipboard.Item)) *widget.List {
+	list := widget.NewList(
 		func() int { return len(store.Items()) },
 		func() fyne.CanvasObject { return newHistoryCard() },
 		func(id widget.ListItemID, obj fyne.CanvasObject) {
-			item := store.Items()[id]
-			card := obj.(*historyCard)
-			card.content.SetText(item.Content)
-			card.onTap = func() { onSelect(item) }
-			card.deleteBtn.OnTapped = func() {
-				store.RemoveAt(id)
-				list.Refresh()
-				onChange()
+			items := store.Items()
+			if id >= len(items) {
+				return
 			}
+			item := items[id]
+
+			imagePath, _ := store.ImagePath(item)
+			card := obj.(*historyCard)
+			card.setItem(item, imagePath)
+			card.onTap = func() { onSelect(item) }
+			card.deleteBtn.OnTapped = func() { store.RemoveAt(id) }
 		},
 	)
 	list.HideSeparators = true

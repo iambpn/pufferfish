@@ -9,8 +9,10 @@ import (
 
 // NewPreferencesWindow returns a function that opens the Pufferfish
 // preferences window. The window is built fresh each time it's opened and
-// destroyed when closed, so it holds no resources while not in use.
-func NewPreferencesWindow(a fyne.App) func() {
+// destroyed when closed, so it holds no resources while not in use. It
+// edits the app's live preferences, so every change takes effect at once
+// rather than on the next launch.
+func NewPreferencesWindow(a fyne.App, prefs *preferences.ClipboardPreferences) func() {
 	var w fyne.Window
 
 	return func() {
@@ -22,7 +24,6 @@ func NewPreferencesWindow(a fyne.App) func() {
 		w = a.NewWindow("Pufferfish Preferences")
 		w.SetOnClosed(func() { w = nil })
 
-		prefs := preferences.LoadClipboardPreferences(a)
 		w.SetContent(ui.NewClipboardSection(prefs))
 		w.Resize(fyne.NewSize(380, 0))
 		w.Show()

@@ -1,3 +1,84 @@
 # Pufferfish
 
-A cross platform clipboard manager similar to diodon
+A cross platform clipboard manager similar to diodon.
+
+Pufferfish lives in the system tray and records what you copy. Open the
+history from the tray to put an earlier item back on the clipboard.
+
+## Preferences
+
+| Setting | Effect |
+| --- | --- |
+| Use clipboard (Ctrl+C) | Start or stop tracking the system clipboard. |
+| Add images to clipboard history | Also capture copied images, stored as PNG files alongside the history. |
+| Keep clipboard content | Put the newest history item back on the clipboard when Pufferfish starts, so a restart doesn't lose your last copy. |
+| Automatically paste selected item | Send the paste shortcut to the focused window after picking an item from the history. |
+| Number of recent items | How many items the history keeps, oldest dropped first. |
+
+Changes apply immediately and persist across restarts.
+
+## History storage
+
+The history index and its image files are kept in the app's storage
+directory (`~/.config/fyne/pufferfish` on Linux) and reloaded on start.
+Clearing the history deletes the stored images with it.
+
+## Automatic paste
+
+Pufferfish cannot inject a keystroke into a window it does not own, so
+"automatically paste selected item" shells out to a helper.
+
+| Platform | Helper | Needs |
+| --- | --- | --- |
+| Linux/BSD | `ydotool` | its `ydotoold` daemon, plus `/dev/uinput` access |
+| Linux/BSD | `wtype` | a wlroots compositor — Sway, Hyprland; not GNOME or KDE |
+| Linux/BSD | `xdotool` | X11; it cannot reach native Wayland windows |
+| macOS | `osascript` | the Accessibility permission |
+| Windows | `powershell` | nothing |
+
+On Linux the first one found on `PATH` is used, in the order above.
+`ydotool` comes first because it injects at the kernel level, which is what
+makes it the only one that works on GNOME and KDE. Without any of them,
+picking an item still copies it and you paste yourself.
+
+### Linux
+
+Install `ydotool` and enable its daemon:
+
+```sh
+sudo apt install ydotool          # or your distro's package
+systemctl --user enable --now ydotoold
+```
+
+If a paste fails because the daemon is down, Pufferfish starts it — first
+via `systemctl --user start ydotoold`, then by running `ydotoold` directly
+— waits for it to serve, and sends the keystroke again. It never escalates
+privileges, and never stops the daemon: other tools share it.
+
+`ydotoold` needs write access to `/dev/uinput`. If it will not start, add
+the udev rule below, then log out and back in:
+
+```sh
+sudo tee /etc/udev/rules.d/99-uinput.rules <<'RULE'
+KERNEL=="uinput", GROUP="input", MODE="0660"
+RULE
+sudo usermod -aG input "$USER"
+sudo udevadm control --reload-rules && sudo udevadm trigger
+```
+
+### macOS
+
+macOS blocks synthetic keystrokes until the app is trusted. Add Pufferfish
+under System Settings > Privacy & Security > Accessibility. There is no way
+to grant this from inside the app.
+
+### Windows
+
+Works out of the box. The one limit is a Windows security rule: a program
+can only send keys to windows at or below its own privilege level, so
+pasting into an app running as administrator needs Pufferfish to run as
+administrator too.
+
+## Development
+
+Run `make help` for the available targets.

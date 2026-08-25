@@ -7,6 +7,7 @@ import (
 	"fyne.io/fyne/v2/layout"
 
 	"github.com/iambpn/pufferfish/internal/clipboard"
+	"github.com/iambpn/pufferfish/internal/preferences"
 	"github.com/iambpn/pufferfish/internal/ui"
 )
 
@@ -18,8 +19,18 @@ const (
 // NewHistoryWindow returns a function that opens the undecorated window
 // listing captured clipboard items. The window is built fresh each time
 // it's opened and destroyed when closed, so it holds no resources while not
-// in use. Selecting an item copies it back to the system clipboard.
-func NewHistoryWindow(a fyne.App, store *clipboard.Store) func() {
+// in use.
+//
+// Selecting an item puts it back on the system clipboard through the
+// watcher, so the restore is not mistaken for a fresh copy, and closes the
+// flyout. With "automatically paste" enabled the paste shortcut is then
+// sent to whichever window regains focus.
+func NewHistoryWindow(
+	a fyne.App,
+	store *clipboard.Store,
+	watcher *clipboard.Watcher,
+	prefs *preferences.ClipboardPreferences,
+) func() {
 	var win fyne.Window
 
 	return func() {
@@ -30,18 +41,32 @@ func NewHistoryWindow(a fyne.App, store *clipboard.Store) func() {
 
 		w := a.Driver().(desktop.Driver).CreateSplashWindow()
 		win = w
+
+		if dw, ok := w.(desktop.Window); ok {
+			p := a.Preferences()
+			posX := p.IntWithFallback(prefKeyHistoryPosX, 100)
+			posY := p.IntWithFallback(prefKeyHistoryPosY, 100)
+			dw.RequestPosition(posX, posY)
+		}
+
+		selectItem := func(item clipboard.Item) {
+			if err := watcher.Put(item); err != nil {
+				fyne.LogError("could not restore the clipboard item", err)
+				return
+			}
+			w.Close()
+			if prefs.AutoPaste {
+				clipboard.Paste()
+			}
+		}
+
+		content, detach := ui.NewHistorySection(store, selectItem, w.Close)
 		w.SetOnClosed(func() {
+			detach()
 			win = nil
 			a.Lifecycle().SetOnExitedForeground(nil)
 		})
 		a.Lifecycle().SetOnExitedForeground(w.Close)
-
-		if dw, ok := w.(desktop.Window); ok {
-			prefs := a.Preferences()
-			posX := prefs.IntWithFallback(prefKeyHistoryPosX, 100)
-			posY := prefs.IntWithFallback(prefKeyHistoryPosY, 100)
-			dw.RequestPosition(posX, posY)
-		}
 
 		w.SetContent(
 			container.New(
@@ -51,13 +76,7 @@ func NewHistoryWindow(a fyne.App, store *clipboard.Store) func() {
 					ui.PaddingSmall,
 					ui.PaddingSmall,
 				),
-				ui.NewHistorySection(
-					store,
-					func(item clipboard.Item) {
-						a.Clipboard().SetContent(item.Content)
-					},
-					w.Close,
-				),
+				content,
 			),
 		)
 

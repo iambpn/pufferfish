@@ -29,7 +29,7 @@ func NewClipboardSection(prefs *preferences.ClipboardPreferences) fyne.CanvasObj
 	recentItems := container.NewHBox(
 		container.NewCenter(widget.NewLabel("Number of recent items")),
 		layout.NewSpacer(),
-		newNumberStepper(prefs.RecentItems, 1, 100, prefs.SetRecentItems),
+		newNumberStepper(prefs.RecentItems, preferences.MinRecentItems, preferences.MaxRecentItems, prefs.SetRecentItems),
 	)
 
 	tip := newFloatingTip()

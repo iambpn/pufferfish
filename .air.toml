@@ -4,6 +4,7 @@ tmp_dir = "tmp"
 [build]
 cmd = "go build -o ./tmp/pufferfish ."
 bin = "./tmp/pufferfish"
+full_bin = "./tmp/pufferfish -dev"
 include_ext = ["go", "toml"]
 exclude_dir = ["tmp", "bin", "wasm", "translations", ".git", ".vscode", ".github"]
 delay = 200
