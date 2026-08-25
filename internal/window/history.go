@@ -1,6 +1,8 @@
 package window
 
 import (
+	"time"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/driver/desktop"
@@ -33,7 +35,8 @@ const (
 // in use.
 //
 // Selecting an item puts it back on the system clipboard through the
-// watcher, so the restore is not mistaken for a fresh copy, and closes the
+// watcher, so the restore is not mistaken for a fresh copy, moves it to the
+// front of the history as if it had just been copied, and closes the
 // flyout. With "automatically paste" enabled the paste shortcut is then
 // sent to whichever window regains focus.
 func NewHistoryWindow(
@@ -58,6 +61,8 @@ func NewHistoryWindow(
 				fyne.LogError("could not restore the clipboard item", err)
 				return
 			}
+			item.CapturedAt = time.Now()
+			store.Add(item)
 			w.Close()
 			if prefs.AutoPaste {
 				clipboard.Paste()

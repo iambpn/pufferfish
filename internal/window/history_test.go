@@ -145,20 +145,62 @@ func TestHistoryWindowSelectingAnItemRestoresItAndCloses(t *testing.T) {
 	}
 }
 
+func TestHistoryWindowSelectingAnOlderItemMovesItToTheFront(t *testing.T) {
+	if err := clipboard.Init(); err != nil {
+		t.Skipf("system clipboard unavailable: %v", err)
+	}
+
+	a := newTestApp(t)
+
+	store := clipboard.NewStore(t.TempDir())
+	store.Add(clipboard.NewTextItem("older"))
+	store.Add(clipboard.NewTextItem("newest"))
+	watcher := clipboard.NewWatcher(store)
+	prefs := preferences.LoadClipboardPreferences(a)
+	prefs.SetAutoPaste(false)
+
+	show := NewHistoryWindow(a, store, watcher, prefs)
+	show()
+
+	win := newestWindow(a)
+	// Items() is newest-first, so "older" renders as the second card.
+	tapCardAt(t, win.Content(), 1)
+
+	items := store.Items()
+	if len(items) != 2 || items[0].Text != "older" || items[1].Text != "newest" {
+		t.Fatalf("want [older, newest] after selecting the older item, got %#v", items)
+	}
+}
+
 // tapFirstCard finds the first tappable, non-hoverable widget in the
 // rendered history section (i.e. a history card, as opposed to the
 // hoverable clear-all/close/delete buttons) and taps it.
 func tapFirstCard(t *testing.T, obj fyne.CanvasObject) {
 	t.Helper()
-	var tap fyne.Tappable
+	tapCardAt(t, obj, 0)
+}
+
+// tapCardAt taps the nth tappable, non-hoverable widget (i.e. history card,
+// in list order) found in the rendered history section.
+func tapCardAt(t *testing.T, obj fyne.CanvasObject, n int) {
+	t.Helper()
+	cards := findCards(obj)
+	if n >= len(cards) {
+		t.Fatalf("want at least %d cards, found %d", n+1, len(cards))
+	}
+	test.Tap(cards[n])
+}
+
+// findCards walks the rendered history section and returns every tappable,
+// non-hoverable widget (i.e. history card, as opposed to the hoverable
+// clear-all/close/delete buttons) in list order.
+func findCards(obj fyne.CanvasObject) []fyne.Tappable {
+	var cards []fyne.Tappable
 	var walk func(fyne.CanvasObject)
 	walk = func(o fyne.CanvasObject) {
-		if tap != nil {
-			return
-		}
 		if tp, ok := o.(fyne.Tappable); ok {
 			if _, hoverable := o.(desktop.Hoverable); !hoverable {
-				tap = tp
+				cards = append(cards, tp)
 				return
 			}
 			// Tappable but also hoverable: a button, or the list's own
@@ -177,8 +219,5 @@ func tapFirstCard(t *testing.T, obj fyne.CanvasObject) {
 		}
 	}
 	walk(obj)
-	if tap == nil {
-		t.Fatal("no tappable card found")
-	}
-	test.Tap(tap)
+	return cards
 }
