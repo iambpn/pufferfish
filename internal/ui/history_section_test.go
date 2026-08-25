@@ -9,6 +9,8 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/test"
+	"fyne.io/fyne/v2/theme"
+	"fyne.io/fyne/v2/widget"
 
 	"github.com/iambpn/pufferfish/internal/clipboard"
 )
@@ -40,7 +42,7 @@ func cards(obj fyne.CanvasObject) []*historyCard {
 func newTestSection(t *testing.T, store *clipboard.Store) (fyne.Window, func()) {
 	t.Helper()
 
-	content, detach := NewHistorySection(store, func(clipboard.Item) {}, func() {})
+	content, detach := NewHistorySection(store, func(clipboard.Item) {}, func() {}, store.Clear)
 	w := test.NewWindow(content)
 	w.Resize(fyne.NewSize(380, 400))
 	return w, detach
@@ -93,7 +95,7 @@ func TestDetachStopsFollowingTheStore(t *testing.T) {
 	test.NewTempApp(t)
 
 	store := clipboard.NewStore(t.TempDir())
-	content, detach := NewHistorySection(store, func(clipboard.Item) {}, func() {})
+	content, detach := NewHistorySection(store, func(clipboard.Item) {}, func() {}, store.Clear)
 	w := test.NewWindow(content)
 	defer w.Close()
 
@@ -130,7 +132,7 @@ func TestTappingACardSelectsIt(t *testing.T) {
 	store.Add(clipboard.NewTextItem("pick me"))
 
 	var picked clipboard.Item
-	content, detach := NewHistorySection(store, func(i clipboard.Item) { picked = i }, func() {})
+	content, detach := NewHistorySection(store, func(i clipboard.Item) { picked = i }, func() {}, store.Clear)
 	defer detach()
 
 	w := test.NewWindow(content)
@@ -200,4 +202,116 @@ func TestTextItemHidesTheThumbnail(t *testing.T) {
 	if !got[0].thumb.Hidden {
 		t.Fatal("text item rendered a thumbnail")
 	}
+}
+
+func TestNoScrollShadowThemeHidesOnlyTheShadowColor(t *testing.T) {
+	base := theme.DefaultTheme()
+	wrapped := noScrollShadowTheme{Theme: base}
+
+	for _, variant := range []fyne.ThemeVariant{theme.VariantLight, theme.VariantDark} {
+		if got := wrapped.Color(theme.ColorNameShadow, variant); got != color.Transparent {
+			t.Fatalf("shadow color = %v, want transparent", got)
+		}
+		if got, want := wrapped.Color(theme.ColorNameForeground, variant), base.Color(theme.ColorNameForeground, variant); got != want {
+			t.Fatalf("foreground color changed: got %v, want %v", got, want)
+		}
+	}
+}
+
+func TestHistorySectionListHasNoScrollShadow(t *testing.T) {
+	test.NewTempApp(t)
+
+	store := clipboard.NewStore(t.TempDir())
+	store.Add(clipboard.NewTextItem("one"))
+
+	w, detach := newTestSection(t, store)
+	defer w.Close()
+	defer detach()
+
+	list := findList(w.Content())
+	if list == nil {
+		t.Fatal("no list rendered")
+	}
+	if got := theme.CurrentForWidget(list).Color(theme.ColorNameShadow, theme.VariantDark); got != color.Transparent {
+		t.Fatalf("list's shadow color = %v, want transparent", got)
+	}
+}
+
+func TestClearAllButtonInvokesCallback(t *testing.T) {
+	test.NewTempApp(t)
+
+	store := clipboard.NewStore(t.TempDir())
+	store.Add(clipboard.NewTextItem("one"))
+
+	var cleared bool
+	content, detach := NewHistorySection(store, func(clipboard.Item) {}, func() {}, func() { cleared = true })
+	w := test.NewWindow(content)
+	w.Resize(fyne.NewSize(380, 400))
+	defer w.Close()
+	defer detach()
+
+	btn := findSmallButton(w.Content())
+	if btn == nil {
+		t.Fatal("no clear-all button rendered")
+	}
+	test.Tap(btn)
+
+	if !cleared {
+		t.Fatal("tapping clear all did not invoke the callback")
+	}
+}
+
+// findSmallButton walks the rendered tree and returns the first smallButton
+// found, if any.
+func findSmallButton(obj fyne.CanvasObject) *smallButton {
+	var found *smallButton
+	var walk func(fyne.CanvasObject)
+	walk = func(o fyne.CanvasObject) {
+		if found != nil {
+			return
+		}
+		if b, ok := o.(*smallButton); ok {
+			found = b
+			return
+		}
+		switch t := o.(type) {
+		case *fyne.Container:
+			for _, child := range t.Objects {
+				walk(child)
+			}
+		case fyne.Widget:
+			for _, child := range test.WidgetRenderer(t).Objects() {
+				walk(child)
+			}
+		}
+	}
+	walk(obj)
+	return found
+}
+
+// findList walks the rendered tree and returns the history list, if any.
+func findList(obj fyne.CanvasObject) *widget.List {
+	var found *widget.List
+	var walk func(fyne.CanvasObject)
+	walk = func(o fyne.CanvasObject) {
+		if found != nil {
+			return
+		}
+		if l, ok := o.(*widget.List); ok {
+			found = l
+			return
+		}
+		switch t := o.(type) {
+		case *fyne.Container:
+			for _, child := range t.Objects {
+				walk(child)
+			}
+		case fyne.Widget:
+			for _, child := range test.WidgetRenderer(t).Objects() {
+				walk(child)
+			}
+		}
+	}
+	walk(obj)
+	return found
 }

@@ -38,6 +38,22 @@ func TestPutRestoresTextToTheSystemClipboard(t *testing.T) {
 	}
 }
 
+func TestClearEmptiesTheSystemClipboard(t *testing.T) {
+	if err := Init(); err != nil {
+		t.Skipf("system clipboard unavailable: %v", err)
+	}
+
+	store := NewStore(t.TempDir())
+	w := NewWatcher(store)
+
+	if err := w.Put(NewTextItem("about to be cleared")); err != nil {
+		t.Fatalf("Put failed: %v", err)
+	}
+	if err := w.Clear(); err != nil {
+		t.Fatalf("Clear failed: %v", err)
+	}
+}
+
 func TestPutRestoresImageToTheSystemClipboard(t *testing.T) {
 	if err := Init(); err != nil {
 		t.Skipf("system clipboard unavailable: %v", err)

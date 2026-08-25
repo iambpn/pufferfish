@@ -15,6 +15,9 @@ func TestDefaultsOnFirstRun(t *testing.T) {
 	if p.RecentItems != defaultRecentItems {
 		t.Fatalf("recent items = %d", p.RecentItems)
 	}
+	if p.HistoryPosition != defaultHistoryPosition {
+		t.Fatalf("history position = %q", p.HistoryPosition)
+	}
 }
 
 func TestSettersPersistAndNotify(t *testing.T) {
@@ -29,9 +32,10 @@ func TestSettersPersistAndNotify(t *testing.T) {
 	p.SetKeepContent(false)
 	p.SetAutoPaste(false)
 	p.SetRecentItems(7)
+	p.SetHistoryPosition(HistoryPositionTopRight)
 
-	if calls != 5 {
-		t.Fatalf("want 5 notifications, got %d", calls)
+	if calls != 6 {
+		t.Fatalf("want 6 notifications, got %d", calls)
 	}
 
 	// Reloading from the same app must see the written-through values.
@@ -41,5 +45,8 @@ func TestSettersPersistAndNotify(t *testing.T) {
 	}
 	if reloaded.RecentItems != 7 {
 		t.Fatalf("recent items = %d", reloaded.RecentItems)
+	}
+	if reloaded.HistoryPosition != HistoryPositionTopRight {
+		t.Fatalf("history position = %q", reloaded.HistoryPosition)
 	}
 }

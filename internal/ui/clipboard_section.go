@@ -32,6 +32,12 @@ func NewClipboardSection(prefs *preferences.ClipboardPreferences) fyne.CanvasObj
 		newNumberStepper(prefs.RecentItems, preferences.MinRecentItems, preferences.MaxRecentItems, prefs.SetRecentItems),
 	)
 
+	historyPosition := container.NewHBox(
+		container.NewCenter(widget.NewLabel("History window position")),
+		layout.NewSpacer(),
+		newHistoryPositionSelect(prefs),
+	)
+
 	tip := newFloatingTip()
 	rows := container.NewVBox(
 		withTooltip(tip, useClipboard, "Watch the clipboard for new copies made with Ctrl+C."),
@@ -39,6 +45,7 @@ func NewClipboardSection(prefs *preferences.ClipboardPreferences) fyne.CanvasObj
 		withTooltip(tip, keepContent, "Keep the last copied item in the system clipboard after Pufferfish closes."),
 		withTooltip(tip, autoPaste, "Automatically paste the selected history item into the active app."),
 		withTooltip(tip, recentItems, "The maximum number of recent items kept in the clipboard history."),
+		withTooltip(tip, historyPosition, "Where the clipboard history window opens on screen."),
 	)
 
 	return container.NewPadded(container.NewStack(rows, tip))
@@ -72,4 +79,41 @@ func newNumberStepper(value, min, max int, onChange func(int)) fyne.CanvasObject
 		container.NewCenter(valueLabel),
 		plusBtn,
 	)
+}
+
+// historyPositionOptions lists the anchors offered by the history-window-
+// position select, in on-screen reading order.
+var historyPositionOptions = []struct {
+	label string
+	value preferences.HistoryPosition
+}{
+	{"Top Left", preferences.HistoryPositionTopLeft},
+	{"Top Center", preferences.HistoryPositionTopCenter},
+	{"Top Right", preferences.HistoryPositionTopRight},
+	{"Center Left", preferences.HistoryPositionCenterLeft},
+	{"Center", preferences.HistoryPositionCenter},
+	{"Center Right", preferences.HistoryPositionCenterRight},
+	{"Bottom Left", preferences.HistoryPositionBottomLeft},
+	{"Bottom Center", preferences.HistoryPositionBottomCenter},
+	{"Bottom Right", preferences.HistoryPositionBottomRight},
+}
+
+// newHistoryPositionSelect renders a dropdown of screen anchors for the
+// history window, calling prefs.SetHistoryPosition when the user picks one.
+func newHistoryPositionSelect(prefs *preferences.ClipboardPreferences) fyne.CanvasObject {
+	labels := make([]string, len(historyPositionOptions))
+	valueForLabel := map[string]preferences.HistoryPosition{}
+	labelForValue := map[preferences.HistoryPosition]string{}
+	for i, opt := range historyPositionOptions {
+		labels[i] = opt.label
+		valueForLabel[opt.label] = opt.value
+		labelForValue[opt.value] = opt.label
+	}
+
+	sel := widget.NewSelect(labels, func(label string) {
+		prefs.SetHistoryPosition(valueForLabel[label])
+	})
+	sel.SetSelected(labelForValue[prefs.HistoryPosition])
+
+	return sel
 }

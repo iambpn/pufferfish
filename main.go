@@ -8,13 +8,21 @@ import (
 	"fyne.io/fyne/v2/driver/desktop"
 
 	"github.com/iambpn/pufferfish/internal/clipboard"
+	"github.com/iambpn/pufferfish/internal/ipc"
 	"github.com/iambpn/pufferfish/internal/preferences"
 	"github.com/iambpn/pufferfish/internal/window"
 )
 
 func main() {
 	dev := flag.Bool("dev", false, "open the history window on startup")
+	history := flag.Bool("history", false, "open the history window, or focus it in the already-running instance")
 	flag.Parse()
+
+	// If another instance is already running, hand it the command and stop
+	// instead of starting a second copy of the app.
+	if *history && ipc.Send(ipc.ShowHistoryCmd) {
+		return
+	}
 
 	a := app.New()
 	// Set the runtime application icon.
@@ -50,11 +58,24 @@ func main() {
 	showPreferences := window.NewPreferencesWindow(a, prefs)
 	showHistory := window.NewHistoryWindow(a, store, watcher, prefs)
 
+	// Claim the IPC port so a later `--history` launch can focus this
+	// instance's history window instead of starting a duplicate.
+	ipc.Listen(func(cmd string) {
+		if cmd == ipc.ShowHistoryCmd {
+			fyne.Do(showHistory)
+		}
+	})
+
 	// Set up the system tray icon and menu.
 	if desk, ok := a.(desktop.App); ok {
 		menu := fyne.NewMenu("Pufferfish",
 			fyne.NewMenuItem("Open History", showHistory),
-			fyne.NewMenuItem("Clear History", store.Clear),
+			fyne.NewMenuItem("Clear History", func() {
+				store.Clear()
+				if err := watcher.Clear(); err != nil {
+					fyne.LogError("could not clear the system clipboard", err)
+				}
+			}),
 			fyne.NewMenuItem("Preferences", showPreferences),
 		)
 
@@ -62,9 +83,9 @@ func main() {
 		desk.SetSystemTrayIcon(resourceIconPng)
 	}
 
-	// In dev mode (--dev), open the history window right away instead of
-	// starting hidden in the tray.
-	if *dev {
+	// With --dev or --history, open the history window right away instead
+	// of starting hidden in the tray.
+	if *dev || *history {
 		showHistory()
 	}
 

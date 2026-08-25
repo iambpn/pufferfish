@@ -23,11 +23,12 @@ var dividerColor = color.NRGBA{R: 128, G: 128, B: 128, A: 60}
 // The section follows the store while it is open, so items copied while the
 // flyout is showing appear straight away. The returned detach function
 // unsubscribes it and must be called when the window closes.
-func NewHistorySection(store *clipboard.Store, onSelect func(clipboard.Item), onClose func()) (content fyne.CanvasObject, detach func()) {
+func NewHistorySection(store *clipboard.Store, onSelect func(clipboard.Item), onClose func(), onClearAll func()) (content fyne.CanvasObject, detach func()) {
 	placeholder := widget.NewLabel("Clipboard history is empty")
 	placeholder.Alignment = fyne.TextAlignCenter
 
 	list := newHistoryList(store, onSelect)
+	listNoShadow := container.NewThemeOverride(list, noScrollShadowTheme{Theme: theme.DefaultTheme()})
 	refresh := func() {
 		list.Refresh()
 		if len(store.Items()) == 0 {
@@ -41,13 +42,13 @@ func NewHistorySection(store *clipboard.Store, onSelect func(clipboard.Item), on
 	refresh()
 	detach = store.AddListener(refresh)
 
-	titleRow := newTitleRow(onClose, store.Clear)
+	titleRow := newTitleRow(onClose, onClearAll)
 	dividerRow := newDividerRow()
 
 	content = container.NewBorder(
 		container.NewVBox(titleRow, dividerRow),
 		nil, nil, nil,
-		container.NewStack(list, container.NewCenter(placeholder)),
+		container.NewStack(listNoShadow, container.NewCenter(placeholder)),
 	)
 	return content, detach
 }
@@ -96,4 +97,19 @@ func newHistoryList(store *clipboard.Store, onSelect func(clipboard.Item)) *widg
 	)
 	list.HideSeparators = true
 	return list
+}
+
+// noScrollShadowTheme suppresses the drop shadow Fyne's scroll container
+// draws at whichever edge has more content to reveal. With cards already
+// touching the flyout's own edges, that shadow reads as a stray smudge over
+// the top card rather than a scroll cue, so it's turned fully transparent.
+type noScrollShadowTheme struct {
+	fyne.Theme
+}
+
+func (t noScrollShadowTheme) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant) color.Color {
+	if name == theme.ColorNameShadow {
+		return color.Transparent
+	}
+	return t.Theme.Color(name, variant)
 }

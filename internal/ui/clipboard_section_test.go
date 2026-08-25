@@ -36,6 +36,16 @@ func checkByLabel(root fyne.CanvasObject, label string) *widget.Check {
 	return found
 }
 
+func selectWidget(root fyne.CanvasObject) *widget.Select {
+	var found *widget.Select
+	walk(root, func(o fyne.CanvasObject) {
+		if s, ok := o.(*widget.Select); ok {
+			found = s
+		}
+	})
+	return found
+}
+
 func circleButtons(root fyne.CanvasObject) []*circleIconButton {
 	var found []*circleIconButton
 	walk(root, func(o fyne.CanvasObject) {
@@ -76,6 +86,39 @@ func TestClipboardSectionCheckboxTogglesThePreference(t *testing.T) {
 	check.SetChecked(false)
 	if prefs.AddImages {
 		t.Fatal("unchecking the box should update the preference")
+	}
+}
+
+func TestHistoryPositionSelectReflectsCurrentPreference(t *testing.T) {
+	a := test.NewTempApp(t)
+	prefs := preferences.LoadClipboardPreferences(a)
+	prefs.SetHistoryPosition(preferences.HistoryPositionBottomLeft)
+
+	section := NewClipboardSection(prefs)
+
+	sel := selectWidget(section)
+	if sel == nil {
+		t.Fatal("select not found")
+	}
+	if sel.Selected != "Bottom Left" {
+		t.Fatalf("selected = %q", sel.Selected)
+	}
+}
+
+func TestHistoryPositionSelectUpdatesThePreference(t *testing.T) {
+	a := test.NewTempApp(t)
+	prefs := preferences.LoadClipboardPreferences(a)
+
+	section := NewClipboardSection(prefs)
+
+	sel := selectWidget(section)
+	if sel == nil {
+		t.Fatal("select not found")
+	}
+
+	sel.SetSelected("Top Right")
+	if prefs.HistoryPosition != preferences.HistoryPositionTopRight {
+		t.Fatalf("history position = %q", prefs.HistoryPosition)
 	}
 }
 

@@ -43,3 +43,10 @@ func (w *Watcher) Put(item Item) error {
 	_, err := system.Write(context.Background(), format, buf)
 	return err
 }
+
+// Clear empties the system clipboard so a paste after "clear all" doesn't
+// bring back an item that was just removed from the history.
+func (w *Watcher) Clear() error {
+	_, err := system.Write(context.Background(), system.FmtText, []byte{})
+	return err
+}
