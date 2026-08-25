@@ -32,13 +32,16 @@ func NewClipboardSection(prefs *preferences.ClipboardPreferences) fyne.CanvasObj
 		newNumberStepper(prefs.RecentItems, 1, 100, prefs.SetRecentItems),
 	)
 
-	return container.NewPadded(container.NewVBox(
-		useClipboard,
-		addImages,
-		keepContent,
-		autoPaste,
-		recentItems,
-	))
+	tip := newFloatingTip()
+	rows := container.NewVBox(
+		withTooltip(tip, useClipboard, "Watch the clipboard for new copies made with Ctrl+C."),
+		withTooltip(tip, addImages, "Also save copied images to the clipboard history."),
+		withTooltip(tip, keepContent, "Keep the last copied item in the system clipboard after Pufferfish closes."),
+		withTooltip(tip, autoPaste, "Automatically paste the selected history item into the active app."),
+		withTooltip(tip, recentItems, "The maximum number of recent items kept in the clipboard history."),
+	)
+
+	return container.NewPadded(container.NewStack(rows, tip))
 }
 
 // newNumberStepper renders a numeric value with -/+ buttons, calling

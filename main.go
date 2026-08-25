@@ -16,21 +16,21 @@ func main() {
 	a.SetIcon(resourceIconPng)
 
 	store := clipboard.NewStore()
-	w := window.NewPreferencesWindow(a)
-	history := window.NewHistoryWindow(a, store)
+	showPreferences := window.NewPreferencesWindow(a)
+	showHistory := window.NewHistoryWindow(a, store)
 
 	// Set up the system tray icon and menu.
 	if desk, ok := a.(desktop.App); ok {
 		menu := fyne.NewMenu("Pufferfish",
-			// clipboard items
-			fyne.NewMenuItem("Clear", func() {}),
-			fyne.NewMenuItem("Clipboard History", history.Show),
-			fyne.NewMenuItem("Preferences", w.Show),
+			fyne.NewMenuItem("Open History", showHistory),
+			fyne.NewMenuItem("Clear History", store.Clear),
+			fyne.NewMenuItem("Preferences", showPreferences),
 		)
 
 		desk.SetSystemTrayMenu(menu)
 		desk.SetSystemTrayIcon(resourceIconPng)
 	}
 
-	w.ShowAndRun()
+	// Start hidden in the system tray; windows are opened from the tray menu.
+	a.Run()
 }

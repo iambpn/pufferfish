@@ -15,49 +15,59 @@ const (
 	prefKeyHistoryPosY = "history.posY"
 )
 
-// NewHistoryWindow builds the undecorated window listing captured clipboard
-// items. Selecting an item copies it back to the system clipboard. Since the
-// window has no OS title bar, it exposes a drag handle whose movement is
-// applied to the window position and remembered across launches.
-func NewHistoryWindow(a fyne.App, store *clipboard.Store) fyne.Window {
-	w := a.Driver().(desktop.Driver).CreateSplashWindow()
-	dw := w.(desktop.Window)
+// NewHistoryWindow returns a function that opens the undecorated window
+// listing captured clipboard items. The window is built fresh each time
+// it's opened and destroyed when closed, so it holds no resources while not
+// in use. Selecting an item copies it back to the system clipboard.
+func NewHistoryWindow(a fyne.App, store *clipboard.Store) func() {
+	var win fyne.Window
 
-	prefs := a.Preferences()
-	posX := prefs.IntWithFallback(prefKeyHistoryPosX, 100)
-	posY := prefs.IntWithFallback(prefKeyHistoryPosY, 100)
-	dw.RequestPosition(posX, posY)
+	return func() {
+		if win != nil {
+			win.RequestFocus()
+			return
+		}
 
-	onDragged := func(dx, dy float32) {
-		posX += int(dx)
-		posY += int(dy)
-		dw.RequestPosition(posX, posY)
-	}
-	onDragEnd := func() {
-		prefs.SetInt(prefKeyHistoryPosX, posX)
-		prefs.SetInt(prefKeyHistoryPosY, posY)
-	}
+		w := a.Driver().(desktop.Driver).CreateSplashWindow()
+		win = w
+		w.SetOnClosed(func() {
+			win = nil
+			a.Lifecycle().SetOnExitedForeground(nil)
+		})
+		a.Lifecycle().SetOnExitedForeground(w.Close)
 
-	w.SetContent(
-		container.New(
-			layout.NewCustomPaddedLayout(
-				ui.PaddingSmall,
-				ui.PaddingSmall,
-				ui.PaddingSmall,
-				ui.PaddingSmall,
+		if dw, ok := w.(desktop.Window); ok {
+			prefs := a.Preferences()
+			posX := prefs.IntWithFallback(prefKeyHistoryPosX, 100)
+			posY := prefs.IntWithFallback(prefKeyHistoryPosY, 100)
+			dw.RequestPosition(posX, posY)
+		}
+
+		w.SetContent(
+			container.New(
+				layout.NewCustomPaddedLayout(
+					ui.PaddingSmall,
+					ui.PaddingSmall,
+					ui.PaddingSmall,
+					ui.PaddingSmall,
+				),
+				ui.NewHistorySection(
+					store,
+					func(item clipboard.Item) {
+						a.Clipboard().SetContent(item.Content)
+					},
+					w.Close,
+				),
 			),
-			ui.NewHistorySection(
-				store,
-				func(item clipboard.Item) {
-					a.Clipboard().SetContent(item.Content)
-				},
-				w.Hide,
-				onDragged,
-				onDragEnd,
-			),
-		),
-	)
+		)
 
-	w.Resize(fyne.NewSize(380, 400))
-	return w
+		w.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
+			if ev.Name == fyne.KeyEscape {
+				w.Close()
+			}
+		})
+
+		w.Resize(fyne.NewSize(380, 400))
+		w.Show()
+	}
 }
