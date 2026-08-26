@@ -16,6 +16,7 @@ const smallButtonTextSize float32 = 11
 // theme's default widget.Button, for secondary actions like "Clear all".
 type smallButton struct {
 	widget.BaseWidget
+	hoverBackground
 
 	text *canvas.Text
 	bg   *canvas.Rectangle
@@ -49,13 +50,15 @@ func (b *smallButton) Cursor() desktop.Cursor {
 }
 
 func (b *smallButton) MouseIn(*desktop.MouseEvent) {
-	b.bg.FillColor = theme.Color(theme.ColorNameHover)
+	b.hovered = true
+	b.bg.FillColor = b.fillColor()
 	b.bg.Refresh()
 }
 
 func (b *smallButton) MouseMoved(*desktop.MouseEvent) {}
 
 func (b *smallButton) MouseOut() {
-	b.bg.FillColor = theme.Color(theme.ColorNameInputBackground)
+	b.hovered = false
+	b.bg.FillColor = b.fillColor()
 	b.bg.Refresh()
 }

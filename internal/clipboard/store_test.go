@@ -7,6 +7,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 )
 
@@ -23,6 +24,7 @@ func pngBytes(t *testing.T, w, h int, c color.Color) []byte {
 
 func TestAddKeepsNewestFirst(t *testing.T) {
 	s := NewStore(t.TempDir())
+	t.Cleanup(s.Flush)
 	s.Add(NewTextItem("one"))
 	s.Add(NewTextItem("two"))
 
@@ -32,8 +34,33 @@ func TestAddKeepsNewestFirst(t *testing.T) {
 	}
 }
 
+func TestLenAndItemAtMatchItems(t *testing.T) {
+	s := NewStore(t.TempDir())
+	t.Cleanup(s.Flush)
+	s.Add(NewTextItem("one"))
+	s.Add(NewTextItem("two"))
+
+	if got := s.Len(); got != 2 {
+		t.Fatalf("Len() = %d, want 2", got)
+	}
+	items := s.Items()
+	for i := range items {
+		item, ok := s.ItemAt(i)
+		if !ok || item != items[i] {
+			t.Fatalf("ItemAt(%d) = %+v, %v; want %+v, true", i, item, ok, items[i])
+		}
+	}
+	if _, ok := s.ItemAt(-1); ok {
+		t.Fatal("ItemAt(-1) should report false")
+	}
+	if _, ok := s.ItemAt(len(items)); ok {
+		t.Fatal("ItemAt(len(items)) should report false")
+	}
+}
+
 func TestAddMovesDuplicateToFront(t *testing.T) {
 	s := NewStore(t.TempDir())
+	t.Cleanup(s.Flush)
 	s.Add(NewTextItem("one"))
 	s.Add(NewTextItem("two"))
 	s.Add(NewTextItem("one"))
@@ -49,6 +76,7 @@ func TestAddMovesDuplicateToFront(t *testing.T) {
 
 func TestSetLimitTrimsOldest(t *testing.T) {
 	s := NewStore(t.TempDir())
+	t.Cleanup(s.Flush)
 	for _, text := range []string{"a", "b", "c"} {
 		s.Add(NewTextItem(text))
 	}
@@ -60,8 +88,24 @@ func TestSetLimitTrimsOldest(t *testing.T) {
 	}
 }
 
+func TestSetLimitClampsAboveMaxLimit(t *testing.T) {
+	s := NewStore(t.TempDir())
+	t.Cleanup(s.Flush)
+	// A stale/hand-edited clipboard.recentItems preference above the
+	// documented max must not let the history grow past it.
+	s.SetLimit(MaxLimit + 50)
+	for i := 0; i < MaxLimit+10; i++ {
+		s.Add(NewTextItem(strconv.Itoa(i)))
+	}
+
+	if items := s.Items(); len(items) != MaxLimit {
+		t.Fatalf("got %d items, want %d (the documented max)", len(items), MaxLimit)
+	}
+}
+
 func TestAddRespectsLimit(t *testing.T) {
 	s := NewStore(t.TempDir())
+	t.Cleanup(s.Flush)
 	s.SetLimit(2)
 	for _, text := range []string{"a", "b", "c"} {
 		s.Add(NewTextItem(text))
@@ -87,6 +131,7 @@ func TestImageIsStoredAndReloaded(t *testing.T) {
 		t.Fatal("image file was not written")
 	}
 
+	s.Flush()
 	reloaded := NewStore(dir)
 	reloaded.Load()
 	if got := reloaded.Items(); len(got) != 1 || got[0].Hash != item.Hash {
@@ -97,6 +142,7 @@ func TestImageIsStoredAndReloaded(t *testing.T) {
 func TestRemoveDeletesImageFile(t *testing.T) {
 	dir := t.TempDir()
 	s := NewStore(dir)
+	t.Cleanup(s.Flush)
 	s.AddImage(pngBytes(t, 2, 2, color.Black))
 	path, _ := s.ImagePath(s.Items()[0])
 
@@ -110,6 +156,7 @@ func TestRemoveDeletesImageFile(t *testing.T) {
 func TestDuplicateImageKeepsItsFile(t *testing.T) {
 	dir := t.TempDir()
 	s := NewStore(dir)
+	t.Cleanup(s.Flush)
 	data := pngBytes(t, 2, 2, color.Black)
 	s.AddImage(data)
 	s.AddImage(data)
@@ -134,6 +181,7 @@ func TestLoadDropsItemsWithMissingImages(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	s.Flush()
 	reloaded := NewStore(dir)
 	reloaded.Load()
 	if got := reloaded.Items(); len(got) != 1 || got[0].Text != "kept" {
@@ -144,6 +192,7 @@ func TestLoadDropsItemsWithMissingImages(t *testing.T) {
 func TestClearRemovesEverything(t *testing.T) {
 	dir := t.TempDir()
 	s := NewStore(dir)
+	t.Cleanup(s.Flush)
 	s.Add(NewTextItem("a"))
 	s.AddImage(pngBytes(t, 2, 2, color.Black))
 
@@ -160,6 +209,7 @@ func TestClearRemovesEverything(t *testing.T) {
 
 func TestListenersFireOnChange(t *testing.T) {
 	s := NewStore(t.TempDir())
+	t.Cleanup(s.Flush)
 	calls := 0
 	remove := s.AddListener(func() {
 		// A listener must be able to read the store without deadlocking.

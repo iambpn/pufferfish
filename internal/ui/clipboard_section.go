@@ -81,39 +81,24 @@ func newNumberStepper(value, min, max int, onChange func(int)) fyne.CanvasObject
 	)
 }
 
-// historyPositionOptions lists the anchors offered by the history-window-
-// position select, in on-screen reading order.
-var historyPositionOptions = []struct {
-	label string
-	value preferences.HistoryPosition
-}{
-	{"Top Left", preferences.HistoryPositionTopLeft},
-	{"Top Center", preferences.HistoryPositionTopCenter},
-	{"Top Right", preferences.HistoryPositionTopRight},
-	{"Center Left", preferences.HistoryPositionCenterLeft},
-	{"Center", preferences.HistoryPositionCenter},
-	{"Center Right", preferences.HistoryPositionCenterRight},
-	{"Bottom Left", preferences.HistoryPositionBottomLeft},
-	{"Bottom Center", preferences.HistoryPositionBottomCenter},
-	{"Bottom Right", preferences.HistoryPositionBottomRight},
-}
-
 // newHistoryPositionSelect renders a dropdown of screen anchors for the
 // history window, calling prefs.SetHistoryPosition when the user picks one.
 func newHistoryPositionSelect(prefs *preferences.ClipboardPreferences) fyne.CanvasObject {
-	labels := make([]string, len(historyPositionOptions))
+	labels := make([]string, len(preferences.HistoryAnchors))
 	valueForLabel := map[string]preferences.HistoryPosition{}
-	labelForValue := map[preferences.HistoryPosition]string{}
-	for i, opt := range historyPositionOptions {
-		labels[i] = opt.label
-		valueForLabel[opt.label] = opt.value
-		labelForValue[opt.value] = opt.label
+	initialLabel := ""
+	for i, a := range preferences.HistoryAnchors {
+		labels[i] = a.Label
+		valueForLabel[a.Label] = a.Position
+		if a.Position == prefs.HistoryPosition {
+			initialLabel = a.Label
+		}
 	}
 
 	sel := widget.NewSelect(labels, func(label string) {
 		prefs.SetHistoryPosition(valueForLabel[label])
 	})
-	sel.SetSelected(labelForValue[prefs.HistoryPosition])
+	sel.SetSelected(initialLabel)
 
 	return sel
 }

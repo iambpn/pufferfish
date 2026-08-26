@@ -54,6 +54,7 @@ func newTestHistoryWindow(t *testing.T) (a fyne.App, show func()) {
 	t.Helper()
 	a = newTestApp(t)
 	store := clipboard.NewStore(t.TempDir())
+	t.Cleanup(store.Flush)
 	watcher := clipboard.NewWatcher(store)
 	prefs := preferences.LoadClipboardPreferences(a)
 	return a, NewHistoryWindow(a, store, watcher, prefs)
@@ -129,6 +130,7 @@ func TestHistoryWindowSelectingAnItemRestoresItAndCloses(t *testing.T) {
 	baseline := windowCount(a)
 
 	store := clipboard.NewStore(t.TempDir())
+	t.Cleanup(store.Flush)
 	store.Add(clipboard.NewTextItem("pick me"))
 	watcher := clipboard.NewWatcher(store)
 	prefs := preferences.LoadClipboardPreferences(a)
@@ -153,6 +155,7 @@ func TestHistoryWindowSelectingAnOlderItemMovesItToTheFront(t *testing.T) {
 	a := newTestApp(t)
 
 	store := clipboard.NewStore(t.TempDir())
+	t.Cleanup(store.Flush)
 	store.Add(clipboard.NewTextItem("older"))
 	store.Add(clipboard.NewTextItem("newest"))
 	watcher := clipboard.NewWatcher(store)

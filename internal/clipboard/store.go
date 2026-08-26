@@ -11,6 +11,11 @@ const historyFileName = "history.json"
 // DefaultLimit is used until preferences supply the configured value.
 const DefaultLimit = 20
 
+// MaxLimit mirrors preferences.MaxRecentItems: SetLimit enforces it
+// directly so the store can never silently exceed the documented maximum,
+// even if a caller passes through an unclamped or stale preference value.
+const MaxLimit = 100
+
 // Store holds captured clipboard items, newest first, persisted to dir so
 // the history survives a restart. Image bytes live in their own files
 // beside the index; removing an item removes its file too.
@@ -26,6 +31,16 @@ type Store struct {
 	listenerMu sync.Mutex
 	nextID     int
 	listeners  map[int]func()
+
+	// saveMu/saveSeq/savedSeq coordinate the background writes saveLocked
+	// dispatches, so the disk write never blocks the caller (typically the
+	// UI goroutine, via fyne.Do) while still landing in the same order the
+	// in-memory state changed, and never lets a slow write clobber a faster
+	// one for a state that's since been superseded. See saveLocked.
+	saveMu   sync.Mutex
+	saveSeq  uint64
+	savedSeq uint64
+	saveWG   sync.WaitGroup
 }
 
 // NewStore creates a store persisting to dir. An empty dir keeps the
@@ -74,6 +89,26 @@ func (s *Store) Items() []Item {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return append([]Item(nil), s.items...)
+}
+
+// Len reports how many items are in the history, without copying the
+// underlying slice the way Items does - cheaper for a caller that only
+// needs the count, such as a list widget's length callback.
+func (s *Store) Len() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.items)
+}
+
+// ItemAt returns the item at index i without copying the rest of the
+// slice the way Items does, reporting false if i is out of range.
+func (s *Store) ItemAt(i int) (Item, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if i < 0 || i >= len(s.items) {
+		return Item{}, false
+	}
+	return s.items[i], true
 }
 
 // Newest returns the most recent item, if there is one.
@@ -159,6 +194,10 @@ func (s *Store) Clear() {
 func (s *Store) SetLimit(n int) {
 	if n < 1 {
 		n = 1
+	}
+
+	if n > MaxLimit {
+		n = MaxLimit
 	}
 
 	s.mu.Lock()

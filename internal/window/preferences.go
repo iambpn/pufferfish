@@ -13,19 +13,17 @@ import (
 // edits the app's live preferences, so every change takes effect at once
 // rather than on the next launch.
 func NewPreferencesWindow(a fyne.App, prefs *preferences.ClipboardPreferences) func() {
-	var w fyne.Window
+	var sw singleWindow
 
 	return func() {
-		if w != nil {
-			w.RequestFocus()
-			return
-		}
+		sw.Open(func(onClosed func()) fyne.Window {
+			w := a.NewWindow("Pufferfish Preferences")
+			w.SetOnClosed(onClosed)
 
-		w = a.NewWindow("Pufferfish Preferences")
-		w.SetOnClosed(func() { w = nil })
-
-		w.SetContent(ui.NewClipboardSection(prefs))
-		w.Resize(fyne.NewSize(380, 0))
-		w.Show()
+			w.SetContent(ui.NewClipboardSection(prefs))
+			w.Resize(fyne.NewSize(380, 0))
+			w.Show()
+			return w
+		})
 	}
 }

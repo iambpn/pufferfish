@@ -106,6 +106,16 @@ func (w *Watcher) handle(data system.Data) {
 	}
 }
 
+// ClearAll empties store and the system clipboard together - the shared
+// behavior behind every "clear history" entry point (the history window's
+// button, the tray menu item), so they can't silently diverge.
+func ClearAll(store *Store, watcher *Watcher) {
+	store.Clear()
+	if err := watcher.Clear(); err != nil {
+		fyne.LogError("could not clear the system clipboard", err)
+	}
+}
+
 func (w *Watcher) capturesImages() bool {
 	w.mu.Lock()
 	defer w.mu.Unlock()

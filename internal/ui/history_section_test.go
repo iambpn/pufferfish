@@ -52,6 +52,7 @@ func TestSectionShowsCapturedItems(t *testing.T) {
 	test.NewTempApp(t)
 
 	store := clipboard.NewStore(t.TempDir())
+	t.Cleanup(store.Flush)
 	store.Add(clipboard.NewTextItem("hello"))
 
 	w, detach := newTestSection(t, store)
@@ -71,6 +72,7 @@ func TestSectionFollowsStoreWhileOpen(t *testing.T) {
 	test.NewTempApp(t)
 
 	store := clipboard.NewStore(t.TempDir())
+	t.Cleanup(store.Flush)
 	w, detach := newTestSection(t, store)
 	defer w.Close()
 	defer detach()
@@ -95,6 +97,7 @@ func TestDetachStopsFollowingTheStore(t *testing.T) {
 	test.NewTempApp(t)
 
 	store := clipboard.NewStore(t.TempDir())
+	t.Cleanup(store.Flush)
 	content, detach := NewHistorySection(store, func(clipboard.Item) {}, func() {}, store.Clear)
 	w := test.NewWindow(content)
 	defer w.Close()
@@ -108,6 +111,7 @@ func TestDeleteButtonRemovesTheItem(t *testing.T) {
 	test.NewTempApp(t)
 
 	store := clipboard.NewStore(t.TempDir())
+	t.Cleanup(store.Flush)
 	store.Add(clipboard.NewTextItem("doomed"))
 
 	w, detach := newTestSection(t, store)
@@ -129,6 +133,7 @@ func TestTappingACardSelectsIt(t *testing.T) {
 	test.NewTempApp(t)
 
 	store := clipboard.NewStore(t.TempDir())
+	t.Cleanup(store.Flush)
 	store.Add(clipboard.NewTextItem("pick me"))
 
 	var picked clipboard.Item
@@ -161,6 +166,7 @@ func TestImageItemShowsThumbnail(t *testing.T) {
 	}
 
 	store := clipboard.NewStore(t.TempDir())
+	t.Cleanup(store.Flush)
 	if !store.AddImage(buf.Bytes()) {
 		t.Fatal("AddImage failed")
 	}
@@ -189,6 +195,7 @@ func TestTextItemHidesTheThumbnail(t *testing.T) {
 	test.NewTempApp(t)
 
 	store := clipboard.NewStore(t.TempDir())
+	t.Cleanup(store.Flush)
 	store.Add(clipboard.NewTextItem("just text"))
 
 	w, detach := newTestSection(t, store)
@@ -222,6 +229,7 @@ func TestHistorySectionListHasNoScrollShadow(t *testing.T) {
 	test.NewTempApp(t)
 
 	store := clipboard.NewStore(t.TempDir())
+	t.Cleanup(store.Flush)
 	store.Add(clipboard.NewTextItem("one"))
 
 	w, detach := newTestSection(t, store)
@@ -241,6 +249,7 @@ func TestClearAllButtonInvokesCallback(t *testing.T) {
 	test.NewTempApp(t)
 
 	store := clipboard.NewStore(t.TempDir())
+	t.Cleanup(store.Flush)
 	store.Add(clipboard.NewTextItem("one"))
 
 	var cleared bool

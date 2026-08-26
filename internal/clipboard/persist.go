@@ -54,8 +54,15 @@ func (s *Store) keepReadableLocked(items []Item) []Item {
 	return kept
 }
 
-// saveLocked writes the history index to disk. The caller must hold the
-// write lock.
+// saveLocked marshals the history index and dispatches it to be written to
+// disk in the background. The caller must hold the write lock.
+//
+// The write itself happens off whatever goroutine called Add/RemoveAt/
+// Clear/SetLimit - typically the UI goroutine, wrapped in fyne.Do - so a
+// slow disk doesn't stall it. Marshaling still happens here, synchronously,
+// since it needs the lock the caller already holds to see a consistent
+// s.items; encoding that (already in-memory) slice to JSON is cheap enough
+// not to matter next to the actual file write.
 func (s *Store) saveLocked() {
 	if s.dir == "" {
 		return
@@ -66,9 +73,41 @@ func (s *Store) saveLocked() {
 		fyne.LogError("could not encode clipboard history", err)
 		return
 	}
+
+	s.saveSeq++
+	seq := s.saveSeq
+	s.saveWG.Add(1)
+	go s.writeSaveAsync(seq, data)
+}
+
+// writeSaveAsync writes data to the history file, unless a later save has
+// already landed - saveLocked's caller no longer holds the lock by the time
+// this runs, so writes from back-to-back saves could otherwise finish out
+// of order and leave a stale one on disk. saveMu serializes the writes
+// themselves so two goroutines can't interleave partial ones.
+func (s *Store) writeSaveAsync(seq uint64, data []byte) {
+	defer s.saveWG.Done()
+
+	s.saveMu.Lock()
+	defer s.saveMu.Unlock()
+
+	if seq <= s.savedSeq {
+		return
+	}
 	if err := os.WriteFile(filepath.Join(s.dir, historyFileName), data, 0o600); err != nil {
 		fyne.LogError("could not save clipboard history", err)
+		return
 	}
+	s.savedSeq = seq
+}
+
+// Flush blocks until every save queued so far has been written to disk (or
+// superseded by a later one). The app calls this on shutdown so the very
+// last change isn't lost to a save still in flight when the process exits;
+// tests call it when they need a write to have landed before reading it
+// back, e.g. reloading a store from disk right after mutating another one.
+func (s *Store) Flush() {
+	s.saveWG.Wait()
 }
 
 // AddImage stores png bytes as a new image item. It returns false when the

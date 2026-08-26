@@ -21,11 +21,11 @@ const (
 // press-and-hold repeat for its action.
 type circleIconButton struct {
 	widget.BaseWidget
+	hoverBackground
 
 	icon   fyne.Resource
 	action func()
 
-	hovered   bool
 	repeating bool
 	pressGen  int
 
@@ -158,11 +158,7 @@ func (r *circleIconButtonRenderer) MinSize() fyne.Size {
 }
 
 func (r *circleIconButtonRenderer) Refresh() {
-	if r.button.hovered {
-		r.button.bg.FillColor = theme.Color(theme.ColorNameHover)
-	} else {
-		r.button.bg.FillColor = theme.Color(theme.ColorNameInputBackground)
-	}
+	r.button.bg.FillColor = r.button.fillColor()
 	canvas.Refresh(r.button.bg)
 	r.icon.Refresh()
 }

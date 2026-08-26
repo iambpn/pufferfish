@@ -30,6 +30,7 @@ func TestRestoreLastItemPutsTheNewestItemBack(t *testing.T) {
 	}
 
 	store := clipboard.NewStore(t.TempDir())
+	t.Cleanup(store.Flush)
 	store.Add(clipboard.NewTextItem("older"))
 	store.Add(clipboard.NewTextItem("newest"))
 	watcher := clipboard.NewWatcher(store)

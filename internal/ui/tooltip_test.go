@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/test"
 	"fyne.io/fyne/v2/widget"
 )
@@ -16,35 +17,46 @@ import (
 // timer actually firing is covered by floating_tip_test.go instead; these
 // tests exercise scheduling/cancellation and the wiring to floatingTip.
 
-func newTestTooltip(text string) (*tooltip, *hoverCatcher) {
+// mouseEvent is a minimal non-nil event; hoverCatcher/showNear both read
+// its Position to hit-test/place things, so a nil *desktop.MouseEvent
+// (valid for the widget.Hoverable methods generally, but not here) would
+// panic.
+func mouseEvent() *desktop.MouseEvent {
+	return &desktop.MouseEvent{PointEvent: fyne.PointEvent{Position: fyne.NewPos(0, 0)}}
+}
+
+func newTestTooltip(t *testing.T, text string) (*tooltip, *hoverCatcher) {
+	t.Helper()
 	tt := withTooltip(newFloatingTip(), widget.NewLabel("row"), text).(*tooltip)
-	test.WidgetRenderer(tt)
+	test.NewTempWindow(t, tt)
 	return tt, tooltipCatcher(tt)
 }
 
 func TestTooltipMouseInSchedulesATimerWithoutShowingImmediately(t *testing.T) {
 	test.NewTempApp(t)
-	tt, catcher := newTestTooltip("explains the row")
+	tt, catcher := newTestTooltip(t, "explains the row")
 
-	catcher.MouseIn(nil)
+	genBefore := tt.showGen
+	catcher.MouseIn(mouseEvent())
 
-	if tt.timer == nil {
-		t.Fatal("MouseIn should schedule a timer")
+	if tt.showGen != genBefore+1 {
+		t.Fatal("MouseIn should schedule a show")
 	}
 	if tt.tip.active {
 		t.Fatal("the tip must not show before the delay elapses")
 	}
-	tt.cancelTimer()
+	tt.cancelAndHide() // invalidate the pending timer so it can't fire after this test ends
 }
 
 func TestTooltipMouseOutCancelsThePendingTimer(t *testing.T) {
 	test.NewTempApp(t)
-	tt, catcher := newTestTooltip("explains the row")
+	tt, catcher := newTestTooltip(t, "explains the row")
 
-	catcher.MouseIn(nil)
+	genBefore := tt.showGen
+	catcher.MouseIn(mouseEvent())
 	catcher.MouseOut()
 
-	if tt.timer != nil {
+	if tt.showGen != genBefore+2 {
 		t.Fatal("MouseOut should cancel the pending show")
 	}
 	if tt.tip.active {
@@ -54,7 +66,7 @@ func TestTooltipMouseOutCancelsThePendingTimer(t *testing.T) {
 
 func TestTooltipMouseOutHidesAnAlreadyShowingTip(t *testing.T) {
 	test.NewTempApp(t)
-	tt, catcher := newTestTooltip("explains the row")
+	tt, catcher := newTestTooltip(t, "explains the row")
 
 	// Simulate the timer having already fired, without waiting on the real
 	// background timer.

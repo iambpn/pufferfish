@@ -37,6 +37,33 @@ const (
 
 const defaultHistoryPosition = HistoryPositionCenter
 
+// HistoryAnchor names one screen anchor the history window can open at,
+// pairing its display label with its slot on the 3x3 anchor grid (0/1/2 for
+// left-or-top/center/right-or-bottom) that a window-placement computation
+// keys off of.
+type HistoryAnchor struct {
+	Position HistoryPosition
+	Label    string
+	Col, Row int
+}
+
+// HistoryAnchors is the single source of the 9 anchors the history window
+// can be positioned at, in on-screen reading order. Both the preferences
+// UI (for its dropdown labels) and the window-placement geometry read from
+// this same list, so adding or renaming an anchor only has one place to
+// change.
+var HistoryAnchors = []HistoryAnchor{
+	{HistoryPositionTopLeft, "Top Left", 0, 0},
+	{HistoryPositionTopCenter, "Top Center", 1, 0},
+	{HistoryPositionTopRight, "Top Right", 2, 0},
+	{HistoryPositionCenterLeft, "Center Left", 0, 1},
+	{HistoryPositionCenter, "Center", 1, 1},
+	{HistoryPositionCenterRight, "Center Right", 2, 1},
+	{HistoryPositionBottomLeft, "Bottom Left", 0, 2},
+	{HistoryPositionBottomCenter, "Bottom Center", 1, 2},
+	{HistoryPositionBottomRight, "Bottom Right", 2, 2},
+}
+
 // ClipboardPreferences holds the clipboard settings shown in the
 // preferences window. Every setter writes through to the app's persistent
 // preference store, so changes survive a restart, and notifies the
@@ -62,10 +89,23 @@ func LoadClipboardPreferences(a fyne.App) *ClipboardPreferences {
 		AddImages:       store.BoolWithFallback(prefKeyAddImages, true),
 		KeepContent:     store.BoolWithFallback(prefKeyKeepContent, true),
 		AutoPaste:       store.BoolWithFallback(prefKeyAutoPaste, true),
-		RecentItems:     store.IntWithFallback(prefKeyRecentItems, defaultRecentItems),
+		RecentItems:     clampRecentItems(store.IntWithFallback(prefKeyRecentItems, defaultRecentItems)),
 		HistoryPosition: HistoryPosition(store.StringWithFallback(prefKeyHistoryPosition, string(defaultHistoryPosition))),
 		store:           store,
 	}
+}
+
+// clampRecentItems keeps v within [MinRecentItems, MaxRecentItems], so a
+// stale or hand-edited preference value can't push the history limit
+// outside the documented bounds.
+func clampRecentItems(v int) int {
+	if v < MinRecentItems {
+		return MinRecentItems
+	}
+	if v > MaxRecentItems {
+		return MaxRecentItems
+	}
+	return v
 }
 
 // AddListener registers fn to run after any preference changes. Listeners
@@ -106,6 +146,7 @@ func (p *ClipboardPreferences) SetAutoPaste(v bool) {
 }
 
 func (p *ClipboardPreferences) SetRecentItems(v int) {
+	v = clampRecentItems(v)
 	p.RecentItems = v
 	p.store.SetInt(prefKeyRecentItems, v)
 	p.notify()

@@ -46,15 +46,41 @@ func newFloatingTip() *floatingTip {
 	return t
 }
 
-// showNear displays text just below target, aligned to target's left edge.
-// target must share floatingTip's coordinate space (i.e. be a direct row in
-// the same stack).
+// showNear displays text just below target, aligned to target's left edge -
+// or, when there isn't enough room below for it to fit without spilling
+// past floatingTip's own bottom edge (where Fyne would clip it, making it
+// invisible), above target instead. target may sit anywhere in the canvas,
+// not necessarily as a direct row alongside floatingTip - both positions
+// are resolved to absolute canvas coordinates first, so nesting target
+// inside other layout containers (a VBox, padding, ...) can't misposition
+// the tip.
 func (t *floatingTip) showNear(text string, target fyne.CanvasObject) {
 	t.label.SetText(text)
-	pos := target.Position()
-	t.offset = fyne.NewPos(pos.X, pos.Y+target.Size().Height+4)
+
+	driver := fyne.CurrentApp().Driver()
+	targetPos := driver.AbsolutePositionForObject(target)
+	tipPos := driver.AbsolutePositionForObject(t)
+	rel := targetPos.Subtract(tipPos)
+
+	boxHeight := t.wrappedHeight() + floatingTipPadH
+	below := rel.Y + target.Size().Height + 4
+	y := below
+	if below+boxHeight > t.Size().Height {
+		if above := rel.Y - 4 - boxHeight; above >= 0 {
+			y = above
+		}
+	}
+
+	t.offset = fyne.NewPos(rel.X, y)
 	t.active = true
 	t.Refresh()
+}
+
+// wrappedHeight resizes the label to floatingTipWidth, forcing a rewrap,
+// and reports the height that wrap needs.
+func (t *floatingTip) wrappedHeight() float32 {
+	t.label.Resize(fyne.NewSize(floatingTipWidth, t.label.MinSize().Height))
+	return t.label.MinSize().Height
 }
 
 func (t *floatingTip) hide() {
@@ -75,13 +101,8 @@ type floatingTipRenderer struct {
 var offscreen = fyne.NewPos(-10000, -10000)
 
 func (r *floatingTipRenderer) Layout(fyne.Size) {
-	label := r.tip.label
-
-	// Resize forces a rewrap at floatingTipWidth; MinSize afterward reports
-	// the wrapped height for that width.
-	label.Resize(fyne.NewSize(floatingTipWidth, label.MinSize().Height))
-	wrappedHeight := label.MinSize().Height
-	label.Resize(fyne.NewSize(floatingTipWidth, wrappedHeight))
+	wrappedHeight := r.tip.wrappedHeight()
+	r.tip.label.Resize(fyne.NewSize(floatingTipWidth, wrappedHeight))
 
 	boxSize := fyne.NewSize(floatingTipWidth+floatingTipPadW, wrappedHeight+floatingTipPadH)
 	r.tip.bg.Resize(boxSize)
@@ -91,7 +112,7 @@ func (r *floatingTipRenderer) Layout(fyne.Size) {
 		pos = r.tip.offset
 	}
 	r.tip.bg.Move(pos)
-	label.Move(pos.AddXY(floatingTipPadW/2, floatingTipPadH/2))
+	r.tip.label.Move(pos.AddXY(floatingTipPadW/2, floatingTipPadH/2))
 }
 
 func (r *floatingTipRenderer) MinSize() fyne.Size {

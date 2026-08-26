@@ -29,6 +29,22 @@ func main() {
 	// this is an embedded icon resource
 	a.SetIcon(resourceIconPng)
 
+	// Claim the IPC port before setting up any store/watcher/tray state, so
+	// a launch that loses the race to an already-running instance exits
+	// immediately instead of running a second, uncoordinated copy of the
+	// app against the same history.json.
+	var showHistory func()
+	ln, ok := ipc.Listen(func(cmd string) {
+		if cmd == ipc.ShowHistoryCmd && showHistory != nil {
+			fyne.Do(showHistory)
+		}
+	})
+	if !ok {
+		fyne.LogError("another instance is already running", nil)
+		return
+	}
+	defer ln.Close()
+
 	clipboardReady := true
 	if err := clipboard.Init(); err != nil {
 		// Without the system clipboard the app still runs, so the saved
@@ -39,6 +55,10 @@ func main() {
 
 	store := clipboard.NewStore(storageDir(a))
 	store.Load()
+	// A save triggered by the last change before quitting is written in the
+	// background; without waiting for it here, it could still be in flight
+	// when the process exits and never make it to disk.
+	a.Lifecycle().SetOnStopped(store.Flush)
 
 	prefs := preferences.LoadClipboardPreferences(a)
 	watcher := clipboard.NewWatcher(store)
@@ -56,26 +76,13 @@ func main() {
 	}
 
 	showPreferences := window.NewPreferencesWindow(a, prefs)
-	showHistory := window.NewHistoryWindow(a, store, watcher, prefs)
-
-	// Claim the IPC port so a later `--history` launch can focus this
-	// instance's history window instead of starting a duplicate.
-	ipc.Listen(func(cmd string) {
-		if cmd == ipc.ShowHistoryCmd {
-			fyne.Do(showHistory)
-		}
-	})
+	showHistory = window.NewHistoryWindow(a, store, watcher, prefs)
 
 	// Set up the system tray icon and menu.
 	if desk, ok := a.(desktop.App); ok {
 		menu := fyne.NewMenu("Pufferfish",
 			fyne.NewMenuItem("Open History", showHistory),
-			fyne.NewMenuItem("Clear History", func() {
-				store.Clear()
-				if err := watcher.Clear(); err != nil {
-					fyne.LogError("could not clear the system clipboard", err)
-				}
-			}),
+			fyne.NewMenuItem("Clear History", func() { clipboard.ClearAll(store, watcher) }),
 			fyne.NewMenuItem("Preferences", showPreferences),
 		)
 

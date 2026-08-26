@@ -61,6 +61,7 @@ func TestPutRestoresImageToTheSystemClipboard(t *testing.T) {
 
 	dir := t.TempDir()
 	store := NewStore(dir)
+	t.Cleanup(store.Flush)
 	if !store.AddImage(pngBytes(t, 2, 2, color.White)) {
 		t.Fatal("AddImage failed")
 	}

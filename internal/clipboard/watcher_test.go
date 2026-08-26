@@ -64,6 +64,7 @@ func TestHandleIgnoresEmptyData(t *testing.T) {
 func TestHandleAddsCapturedText(t *testing.T) {
 	test.NewTempApp(t)
 	store := NewStore(t.TempDir())
+	t.Cleanup(store.Flush)
 	w := NewWatcher(store)
 
 	w.handle(system.Data{Format: system.FmtText, Bytes: []byte("copied text")})
@@ -104,6 +105,7 @@ func TestHandleDropsImagesWhenCaptureIsOff(t *testing.T) {
 func TestHandleAddsImagesWhenCaptureIsOn(t *testing.T) {
 	test.NewTempApp(t)
 	store := NewStore(t.TempDir())
+	t.Cleanup(store.Flush)
 	w := NewWatcher(store)
 	w.SetCaptureImages(true)
 

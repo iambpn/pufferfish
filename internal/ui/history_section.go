@@ -31,7 +31,7 @@ func NewHistorySection(store *clipboard.Store, onSelect func(clipboard.Item), on
 	listNoShadow := container.NewThemeOverride(list, noScrollShadowTheme{Theme: theme.DefaultTheme()})
 	refresh := func() {
 		list.Refresh()
-		if len(store.Items()) == 0 {
+		if store.Len() == 0 {
 			placeholder.Show()
 			list.Hide()
 		} else {
@@ -79,14 +79,13 @@ func newDividerRow() fyne.CanvasObject {
 // section's listener.
 func newHistoryList(store *clipboard.Store, onSelect func(clipboard.Item)) *widget.List {
 	list := widget.NewList(
-		func() int { return len(store.Items()) },
+		func() int { return store.Len() },
 		func() fyne.CanvasObject { return newHistoryCard() },
 		func(id widget.ListItemID, obj fyne.CanvasObject) {
-			items := store.Items()
-			if id >= len(items) {
+			item, ok := store.ItemAt(id)
+			if !ok {
 				return
 			}
-			item := items[id]
 
 			imagePath, _ := store.ImagePath(item)
 			card := obj.(*historyCard)

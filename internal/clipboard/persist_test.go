@@ -51,11 +51,46 @@ func TestLoadPersistsAcrossStores(t *testing.T) {
 	s.Add(NewTextItem("one"))
 	s.Add(NewTextItem("two"))
 
+	s.Flush()
 	reloaded := NewStore(dir)
 	reloaded.Load()
 
 	items := reloaded.Items()
 	if len(items) != 2 || items[0].Text != "two" || items[1].Text != "one" {
 		t.Fatalf("got %+v", items)
+	}
+}
+
+func TestFlushBlocksUntilTheBackgroundWriteLands(t *testing.T) {
+	dir := t.TempDir()
+	s := NewStore(dir)
+	s.Add(NewTextItem("a"))
+
+	s.Flush()
+
+	if _, err := os.Stat(filepath.Join(dir, historyFileName)); err != nil {
+		t.Fatalf("history file missing after Flush: %v", err)
+	}
+}
+
+// TestStaleSaveNeverClobbersANewerOne exercises writeSaveAsync's ordering
+// guard directly: saveLocked's background writes can otherwise finish in
+// whatever order the goroutine scheduler picks, and an older save landing
+// after a newer one would silently leave stale data on disk.
+func TestStaleSaveNeverClobbersANewerOne(t *testing.T) {
+	dir := t.TempDir()
+	s := NewStore(dir)
+
+	s.saveWG.Add(1)
+	s.writeSaveAsync(2, []byte(`"newer"`))
+	s.saveWG.Add(1)
+	s.writeSaveAsync(1, []byte(`"older"`)) // stale: must be dropped
+
+	got, err := os.ReadFile(filepath.Join(dir, historyFileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != `"newer"` {
+		t.Fatalf("got %q, want the newer save to still be on disk", got)
 	}
 }

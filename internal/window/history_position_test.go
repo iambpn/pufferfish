@@ -13,6 +13,7 @@ func TestHistoryWindowOriginAnchorsToTheRequestedCorner(t *testing.T) {
 		pos  preferences.HistoryPosition
 		x, y int
 	}{
+		{preferences.HistoryPositionCenter, (screenW - historyWindowWidth) / 2, (screenH - historyWindowHeight) / 2},
 		{preferences.HistoryPositionTopLeft, historyWindowMargin, historyWindowMargin},
 		{preferences.HistoryPositionTopCenter, (screenW - historyWindowWidth) / 2, historyWindowMargin},
 		{preferences.HistoryPositionTopRight, screenW - historyWindowWidth - historyWindowMargin, historyWindowMargin},

@@ -45,95 +45,99 @@ func NewHistoryWindow(
 	watcher *clipboard.Watcher,
 	prefs *preferences.ClipboardPreferences,
 ) func() {
-	var win fyne.Window
+	var sw singleWindow
 
 	return func() {
-		if win != nil {
-			win.RequestFocus()
-			return
-		}
+		sw.Open(func(onClosed func()) fyne.Window {
+			w := a.Driver().(desktop.Driver).CreateSplashWindow()
 
-		w := a.Driver().(desktop.Driver).CreateSplashWindow()
-		win = w
-
-		selectItem := func(item clipboard.Item) {
-			if err := watcher.Put(item); err != nil {
-				fyne.LogError("could not restore the clipboard item", err)
-				return
-			}
-			item.CapturedAt = time.Now()
-			store.Add(item)
-			w.Close()
-			if prefs.AutoPaste {
-				clipboard.Paste()
-			}
-		}
-
-		clearAll := func() {
-			store.Clear()
-			if err := watcher.Clear(); err != nil {
-				fyne.LogError("could not clear the system clipboard", err)
-			}
-		}
-
-		content, detach := ui.NewHistorySection(store, selectItem, w.Close, clearAll)
-		w.SetOnClosed(func() {
-			detach()
-			win = nil
-			a.Lifecycle().SetOnExitedForeground(nil)
-		})
-		a.Lifecycle().SetOnExitedForeground(w.Close)
-
-		w.SetContent(
-			container.New(
-				layout.NewCustomPaddedLayout(
-					ui.PaddingSmall,
-					ui.PaddingSmall,
-					ui.PaddingSmall,
-					ui.PaddingSmall,
-				),
-				content,
-			),
-		)
-
-		w.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
-			if ev.Name == fyne.KeyEscape {
+			selectItem := func(item clipboard.Item) {
+				if err := watcher.Put(item); err != nil {
+					fyne.LogError("could not restore the clipboard item", err)
+					return
+				}
+				item.CapturedAt = time.Now()
+				store.Add(item)
 				w.Close()
+				if prefs.AutoPaste {
+					clipboard.Paste()
+				}
 			}
-		})
 
-		w.Resize(fyne.NewSize(historyWindowWidth, historyWindowHeight))
-		w.Show()
-		// A splash window centers itself the first time it's shown, which
-		// would override a position requested beforehand - so position it
-		// only now that centering has already happened.
-		positionHistoryWindow(w, prefs.HistoryPosition)
+			clearAll := func() { clipboard.ClearAll(store, watcher) }
+
+			content, detach := ui.NewHistorySection(store, selectItem, w.Close, clearAll)
+			w.SetOnClosed(func() {
+				detach()
+				onClosed()
+				a.Lifecycle().SetOnExitedForeground(nil)
+			})
+			a.Lifecycle().SetOnExitedForeground(w.Close)
+
+			w.SetContent(
+				container.New(
+					layout.NewCustomPaddedLayout(
+						ui.PaddingSmall,
+						ui.PaddingSmall,
+						ui.PaddingSmall,
+						ui.PaddingSmall,
+					),
+					content,
+				),
+			)
+
+			w.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
+				if ev.Name == fyne.KeyEscape {
+					w.Close()
+				}
+			})
+
+			w.Resize(fyne.NewSize(historyWindowWidth, historyWindowHeight))
+			w.Show()
+			// A splash window centers itself the first time it's shown, which
+			// would override a position requested beforehand - so position it
+			// only now that centering has already happened.
+			positionHistoryWindow(w, prefs.HistoryPosition)
+			return w
+		})
 	}
 }
 
-// positionHistoryWindow moves w to match pos. Center uses Fyne's own
-// CenterOnScreen; the other anchors need the screen size, which Fyne has no
-// portable API for, so they go through RequestPosition instead.
+// positionHistoryWindow moves w to match pos. Every anchor, including
+// Center, needs the screen size to compute its target position, which Fyne
+// has no portable API for, so they all go through RequestPosition; only
+// when the screen size can't be determined does Center fall back to Fyne's
+// own CenterOnScreen (a documented no-op under Wayland, but still the best
+// available option with nothing to compute a position from).
 //
-// Both are still only requests: Fyne's own docs note a window manager may
+// RequestPosition is still only a request: Fyne's own docs note a window manager may
 // ignore RequestPosition outright, and on GNOME's Mutter (tested under
 // Wayland with XWayland windows) the delivered position can also come out
 // scaled from what was asked, for reasons outside Pufferfish's control. On
 // window managers that honor positioning requests as given, this places the
 // window exactly at the requested anchor.
 func positionHistoryWindow(w fyne.Window, pos preferences.HistoryPosition) {
-	if pos == preferences.HistoryPositionCenter || pos == "" {
-		w.CenterOnScreen()
-		return
+	if pos == "" {
+		pos = preferences.HistoryPositionCenter
 	}
 
 	dw, ok := w.(desktop.Window)
 	if !ok {
+		// No RequestPosition on this platform - CenterOnScreen is the best
+		// available placement for every anchor.
+		w.CenterOnScreen()
 		return
 	}
 
 	screenW, screenH, ok := screen.Size()
 	if !ok {
+		// CenterOnScreen is itself a documented no-op under Wayland, but
+		// with no screen size to compute a position from it's still the
+		// best available fallback there, and works as intended elsewhere.
+		if pos == preferences.HistoryPositionCenter {
+			w.CenterOnScreen()
+			return
+		}
 		dw.RequestPosition(historyWindowFallbackX, historyWindowFallbackY)
 		return
 	}
@@ -143,33 +147,25 @@ func positionHistoryWindow(w fyne.Window, pos preferences.HistoryPosition) {
 }
 
 // historyWindowOrigin computes the top-left corner for the history window
-// under pos, given the primary screen's size.
+// under pos, given the primary screen's size. The 9 anchors themselves come
+// from preferences.HistoryAnchors, the single shared source also used to
+// label the position dropdown in the preferences UI.
 func historyWindowOrigin(pos preferences.HistoryPosition, screenW, screenH int) (x, y int) {
-	left := historyWindowMargin
-	right := screenW - historyWindowWidth - historyWindowMargin
-	centerX := (screenW - historyWindowWidth) / 2
-	top := historyWindowMargin
-	bottom := screenH - historyWindowHeight - historyWindowMargin
-	centerY := (screenH - historyWindowHeight) / 2
-
-	switch pos {
-	case preferences.HistoryPositionTopLeft:
-		return left, top
-	case preferences.HistoryPositionTopCenter:
-		return centerX, top
-	case preferences.HistoryPositionTopRight:
-		return right, top
-	case preferences.HistoryPositionCenterLeft:
-		return left, centerY
-	case preferences.HistoryPositionCenterRight:
-		return right, centerY
-	case preferences.HistoryPositionBottomLeft:
-		return left, bottom
-	case preferences.HistoryPositionBottomCenter:
-		return centerX, bottom
-	case preferences.HistoryPositionBottomRight:
-		return right, bottom
-	default:
-		return historyWindowFallbackX, historyWindowFallbackY
+	xs := [3]int{
+		historyWindowMargin,
+		(screenW - historyWindowWidth) / 2,
+		screenW - historyWindowWidth - historyWindowMargin,
 	}
+	ys := [3]int{
+		historyWindowMargin,
+		(screenH - historyWindowHeight) / 2,
+		screenH - historyWindowHeight - historyWindowMargin,
+	}
+
+	for _, a := range preferences.HistoryAnchors {
+		if a.Position == pos {
+			return xs[a.Col], ys[a.Row]
+		}
+	}
+	return historyWindowFallbackX, historyWindowFallbackY
 }
