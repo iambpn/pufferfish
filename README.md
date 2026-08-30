@@ -12,6 +12,28 @@ Download the latest release from the [releases page](https://github.com/iambpn/p
 
 > Releases are also available for Linux and Windows only. For macOS, you need to build from source.
 
+### Linux
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/iambpn/pufferfish/main/install.sh | sudo sh
+```
+
+This downloads the matching-arch release tarball and installs the binary,
+`.desktop` entry, and icon under `/usr/local`. Variations:
+
+```sh
+# a specific version
+curl -fsSL https://raw.githubusercontent.com/iambpn/pufferfish/main/install.sh | sudo sh -s -- v0.1.0
+
+# uninstall
+curl -fsSL https://raw.githubusercontent.com/iambpn/pufferfish/main/install.sh | sudo sh -s -- uninstall
+```
+
+Run it from a clone instead if you prefer (`sudo ./install.sh`, same
+arguments). A local `*pufferfish*.tar.xz` next to the script is used in
+place of a download when present. Set `PREFIX` to install somewhere other
+than `/usr/local`.
+
 ## Opening the history
 
 The tray menu has three items: **Open History**, **Clear History**, and
