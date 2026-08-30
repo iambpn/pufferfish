@@ -18,8 +18,9 @@ Download the latest release from the [releases page](https://github.com/iambpn/p
 curl -fsSL https://raw.githubusercontent.com/iambpn/pufferfish/main/install.sh | sudo sh
 ```
 
-This downloads the matching-arch release tarball and installs the binary,
-`.desktop` entry, and icon under `/usr/local`. Variations:
+This downloads the matching-arch release tarball and installs the binary
+and icon under `/usr/local`, adds a launcher to the applications menu, and
+drops a shortcut on each user's Desktop. Variations:
 
 ```sh
 # a specific version
@@ -36,8 +37,11 @@ than `/usr/local`.
 
 The installer also adds a system-wide autostart entry
 (`/etc/xdg/autostart/pufferfish.desktop`) so the tray app starts on
-login. `uninstall` removes it; set `AUTOSTART_DIR` to change the
-location.
+login, an applications-menu launcher
+(`/usr/local/share/applications/pufferfish.desktop`), and a
+`pufferfish.desktop` shortcut on the Desktop of every real user (marked
+trusted for GNOME). `uninstall` removes all of them; set `AUTOSTART_DIR`
+to change the autostart location.
 
 ## Opening the history
 
