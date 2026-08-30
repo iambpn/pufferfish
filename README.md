@@ -111,3 +111,21 @@ Run `make help` for the available targets. `make run` starts the app;
 The binary takes two flags: `--history` (documented above) and `--dev`,
 which opens the history window on startup instead of starting hidden in
 the tray.
+
+## Releasing
+
+The `Release` workflow (`.github/workflows/release.yml`) cross-packages
+Linux (amd64, arm64) and Windows (amd64) with `fyne-cross` and publishes a
+GitHub release with the archives attached and auto-generated notes.
+
+1. Bump `Version` (and `Build`) in `FyneApp.toml`, commit, and push to
+   `main`.
+2. Publish, either way:
+   - **Tag:** push a tag named `vX.Y.Z` (`git tag v0.1.0 && git push
+     origin v0.1.0`). The release is cut for that tag.
+   - **Manual:** Actions tab > Release > *Run workflow*. Leave the version
+     input blank to use `v<FyneApp.toml Version>`, or type an explicit
+     `vX.Y.Z`. The tag is created on the selected branch if missing.
+
+macOS is not built in CI (Apple's SDK licence). Build it on a Mac with
+`make package-darwin` and attach the result to the release manually.
