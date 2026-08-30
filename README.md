@@ -6,6 +6,12 @@ Pufferfish lives in the system tray and records what you copy. Open the
 history to put an earlier item back on the clipboard; picking an item also
 moves it to the front, as if it had just been copied.
 
+## Installation
+
+Download the latest release from the [releases page](https://github.com/iambpn/pufferfish/releases).
+
+> Releases are also available for Linux and Windows only. For macOS, you need to build from source.
+
 ## Opening the history
 
 The tray menu has three items: **Open History**, **Clear History**, and
@@ -15,6 +21,10 @@ Running `pufferfish --history` opens the history too. If an instance is
 already running it just focuses that one's window (the instances talk over
 a loopback port), so the flag is safe to bind to a global hotkey. Only one
 instance runs at a time; a second launch without `--history` exits.
+
+> **NOTE:** Pufferfish has no built-in hotkey. Set up the clipboard
+> manager shortcut through your system/OS keyboard settings and point it
+> at the `pufferfish --history` command.
 
 The history window has no title bar. Drag any empty part of it to move it,
 and it reopens where you left it. `Esc` or the ✕ closes it.
@@ -57,7 +67,7 @@ picking an item still copies it and you paste yourself.
 
 ### Linux
 
-Install `ydotool` and enable its daemon:
+`ydotool` should be already installed in many popular distro and if not installed then you can install `ydotool` and enable its daemon:
 
 ```sh
 sudo apt install ydotool          # or your distro's package
