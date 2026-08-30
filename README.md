@@ -3,7 +3,21 @@
 A cross platform clipboard manager similar to diodon.
 
 Pufferfish lives in the system tray and records what you copy. Open the
-history from the tray to put an earlier item back on the clipboard.
+history to put an earlier item back on the clipboard; picking an item also
+moves it to the front, as if it had just been copied.
+
+## Opening the history
+
+The tray menu has three items: **Open History**, **Clear History**, and
+**Preferences**.
+
+Running `pufferfish --history` opens the history too. If an instance is
+already running it just focuses that one's window (the instances talk over
+a loopback port), so the flag is safe to bind to a global hotkey. Only one
+instance runs at a time; a second launch without `--history` exits.
+
+The history window has no title bar. Drag any empty part of it to move it,
+and it reopens where you left it. `Esc` or the ✕ closes it.
 
 ## Preferences
 
@@ -81,4 +95,9 @@ administrator too.
 
 ## Development
 
-Run `make help` for the available targets.
+Run `make help` for the available targets. `make run` starts the app;
+`make dev` runs it with hot reload.
+
+The binary takes two flags: `--history` (documented above) and `--dev`,
+which opens the history window on startup instead of starting hidden in
+the tray.
