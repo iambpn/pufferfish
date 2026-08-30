@@ -34,6 +34,11 @@ arguments). A local `*pufferfish*.tar.xz` next to the script is used in
 place of a download when present. Set `PREFIX` to install somewhere other
 than `/usr/local`.
 
+The installer also adds a system-wide autostart entry
+(`/etc/xdg/autostart/pufferfish.desktop`) so the tray app starts on
+login. `uninstall` removes it; set `AUTOSTART_DIR` to change the
+location.
+
 ## Opening the history
 
 The tray menu has three items: **Open History**, **Clear History**, and
