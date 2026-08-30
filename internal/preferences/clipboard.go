@@ -3,12 +3,20 @@ package preferences
 import "fyne.io/fyne/v2"
 
 const (
-	prefKeyUseClipboard    = "clipboard.useClipboard"
-	prefKeyAddImages       = "clipboard.addImages"
-	prefKeyKeepContent     = "clipboard.keepContent"
-	prefKeyAutoPaste       = "clipboard.autoPaste"
-	prefKeyRecentItems     = "clipboard.recentItems"
-	prefKeyHistoryPosition = "clipboard.historyPosition"
+	prefKeyUseClipboard = "clipboard.useClipboard"
+	prefKeyAddImages    = "clipboard.addImages"
+	prefKeyKeepContent  = "clipboard.keepContent"
+	prefKeyAutoPaste    = "clipboard.autoPaste"
+	prefKeyRecentItems  = "clipboard.recentItems"
+	prefKeyHistoryX     = "clipboard.historyX"
+	prefKeyHistoryY     = "clipboard.historyY"
+)
+
+// defaultHistoryX/Y is where the history window opens before the user has
+// dragged it anywhere.
+const (
+	defaultHistoryX = 80
+	defaultHistoryY = 80
 )
 
 // MinRecentItems and MaxRecentItems bound the number of items the history
@@ -20,61 +28,19 @@ const (
 
 const defaultRecentItems = 20
 
-// HistoryPosition names a screen anchor the history window can open at.
-type HistoryPosition string
-
-const (
-	HistoryPositionTopLeft      HistoryPosition = "top-left"
-	HistoryPositionTopCenter    HistoryPosition = "top-center"
-	HistoryPositionTopRight     HistoryPosition = "top-right"
-	HistoryPositionCenterLeft   HistoryPosition = "center-left"
-	HistoryPositionCenter       HistoryPosition = "center"
-	HistoryPositionCenterRight  HistoryPosition = "center-right"
-	HistoryPositionBottomLeft   HistoryPosition = "bottom-left"
-	HistoryPositionBottomCenter HistoryPosition = "bottom-center"
-	HistoryPositionBottomRight  HistoryPosition = "bottom-right"
-)
-
-const defaultHistoryPosition = HistoryPositionCenter
-
-// HistoryAnchor names one screen anchor the history window can open at,
-// pairing its display label with its slot on the 3x3 anchor grid (0/1/2 for
-// left-or-top/center/right-or-bottom) that a window-placement computation
-// keys off of.
-type HistoryAnchor struct {
-	Position HistoryPosition
-	Label    string
-	Col, Row int
-}
-
-// HistoryAnchors is the single source of the 9 anchors the history window
-// can be positioned at, in on-screen reading order. Both the preferences
-// UI (for its dropdown labels) and the window-placement geometry read from
-// this same list, so adding or renaming an anchor only has one place to
-// change.
-var HistoryAnchors = []HistoryAnchor{
-	{HistoryPositionTopLeft, "Top Left", 0, 0},
-	{HistoryPositionTopCenter, "Top Center", 1, 0},
-	{HistoryPositionTopRight, "Top Right", 2, 0},
-	{HistoryPositionCenterLeft, "Center Left", 0, 1},
-	{HistoryPositionCenter, "Center", 1, 1},
-	{HistoryPositionCenterRight, "Center Right", 2, 1},
-	{HistoryPositionBottomLeft, "Bottom Left", 0, 2},
-	{HistoryPositionBottomCenter, "Bottom Center", 1, 2},
-	{HistoryPositionBottomRight, "Bottom Right", 2, 2},
-}
-
 // ClipboardPreferences holds the clipboard settings shown in the
 // preferences window. Every setter writes through to the app's persistent
 // preference store, so changes survive a restart, and notifies the
 // registered listeners so the running app follows the new setting at once.
 type ClipboardPreferences struct {
-	UseClipboard    bool
-	AddImages       bool
-	KeepContent     bool
-	AutoPaste       bool
-	RecentItems     int
-	HistoryPosition HistoryPosition
+	UseClipboard bool
+	AddImages    bool
+	KeepContent  bool
+	AutoPaste    bool
+	RecentItems  int
+	// HistoryX/Y is the last position the user dragged the history window
+	// to, so it reopens where they left it.
+	HistoryX, HistoryY int
 
 	store     fyne.Preferences
 	listeners []func()
@@ -85,13 +51,14 @@ type ClipboardPreferences struct {
 func LoadClipboardPreferences(a fyne.App) *ClipboardPreferences {
 	store := a.Preferences()
 	return &ClipboardPreferences{
-		UseClipboard:    store.BoolWithFallback(prefKeyUseClipboard, true),
-		AddImages:       store.BoolWithFallback(prefKeyAddImages, true),
-		KeepContent:     store.BoolWithFallback(prefKeyKeepContent, true),
-		AutoPaste:       store.BoolWithFallback(prefKeyAutoPaste, true),
-		RecentItems:     clampRecentItems(store.IntWithFallback(prefKeyRecentItems, defaultRecentItems)),
-		HistoryPosition: HistoryPosition(store.StringWithFallback(prefKeyHistoryPosition, string(defaultHistoryPosition))),
-		store:           store,
+		UseClipboard: store.BoolWithFallback(prefKeyUseClipboard, true),
+		AddImages:    store.BoolWithFallback(prefKeyAddImages, true),
+		KeepContent:  store.BoolWithFallback(prefKeyKeepContent, true),
+		AutoPaste:    store.BoolWithFallback(prefKeyAutoPaste, true),
+		RecentItems:  clampRecentItems(store.IntWithFallback(prefKeyRecentItems, defaultRecentItems)),
+		HistoryX:     store.IntWithFallback(prefKeyHistoryX, defaultHistoryX),
+		HistoryY:     store.IntWithFallback(prefKeyHistoryY, defaultHistoryY),
+		store:        store,
 	}
 }
 
@@ -152,8 +119,10 @@ func (p *ClipboardPreferences) SetRecentItems(v int) {
 	p.notify()
 }
 
-func (p *ClipboardPreferences) SetHistoryPosition(v HistoryPosition) {
-	p.HistoryPosition = v
-	p.store.SetString(prefKeyHistoryPosition, string(v))
-	p.notify()
+// SetHistoryCoords records where the user dragged the history window. No
+// listener re-applies a window position, so it doesn't notify.
+func (p *ClipboardPreferences) SetHistoryCoords(x, y int) {
+	p.HistoryX, p.HistoryY = x, y
+	p.store.SetInt(prefKeyHistoryX, x)
+	p.store.SetInt(prefKeyHistoryY, y)
 }

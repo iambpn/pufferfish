@@ -10,23 +10,12 @@ import (
 
 	"github.com/iambpn/pufferfish/internal/clipboard"
 	"github.com/iambpn/pufferfish/internal/preferences"
-	"github.com/iambpn/pufferfish/internal/screen"
 	"github.com/iambpn/pufferfish/internal/ui"
 )
 
 const (
 	historyWindowWidth  = 380
 	historyWindowHeight = 400
-
-	// historyWindowMargin keeps an edge-anchored window off the screen edge
-	// it's anchored to.
-	historyWindowMargin = 20
-
-	// historyWindowFallbackX/Y is where the window opens when its position
-	// can't be computed - HistoryPositionCenter, or no screen.Size backend
-	// on this platform.
-	historyWindowFallbackX = 100
-	historyWindowFallbackY = 100
 )
 
 // NewHistoryWindow returns a function that opens the undecorated window
@@ -74,6 +63,15 @@ func NewHistoryWindow(
 			})
 			a.Lifecycle().SetOnExitedForeground(w.Close)
 
+			// The window has no title bar, so wrap its content in a mover
+			// that drags the window when the pointer is dragged over any
+			// non-interactive part of it.
+			var root fyne.CanvasObject = content
+			dw, movable := w.(desktop.Window)
+			if movable {
+				root = newWindowMover(content, dw, prefs.HistoryX, prefs.HistoryY, prefs.SetHistoryCoords)
+			}
+
 			w.SetContent(
 				container.New(
 					layout.NewCustomPaddedLayout(
@@ -82,7 +80,7 @@ func NewHistoryWindow(
 						ui.PaddingSmall,
 						ui.PaddingSmall,
 					),
-					content,
+					root,
 				),
 			)
 
@@ -94,78 +92,13 @@ func NewHistoryWindow(
 
 			w.Resize(fyne.NewSize(historyWindowWidth, historyWindowHeight))
 			w.Show()
-			// A splash window centers itself the first time it's shown, which
-			// would override a position requested beforehand - so position it
-			// only now that centering has already happened.
-			positionHistoryWindow(w, prefs.HistoryPosition)
+			// A splash window centers itself the first time it's shown,
+			// which would override an earlier RequestPosition, so restore
+			// the saved position only now that centering has happened.
+			if movable {
+				dw.RequestPosition(prefs.HistoryX, prefs.HistoryY)
+			}
 			return w
 		})
 	}
-}
-
-// positionHistoryWindow moves w to match pos. Every anchor, including
-// Center, needs the screen size to compute its target position, which Fyne
-// has no portable API for, so they all go through RequestPosition; only
-// when the screen size can't be determined does Center fall back to Fyne's
-// own CenterOnScreen (a documented no-op under Wayland, but still the best
-// available option with nothing to compute a position from).
-//
-// RequestPosition is still only a request: Fyne's own docs note a window manager may
-// ignore RequestPosition outright, and on GNOME's Mutter (tested under
-// Wayland with XWayland windows) the delivered position can also come out
-// scaled from what was asked, for reasons outside Pufferfish's control. On
-// window managers that honor positioning requests as given, this places the
-// window exactly at the requested anchor.
-func positionHistoryWindow(w fyne.Window, pos preferences.HistoryPosition) {
-	if pos == "" {
-		pos = preferences.HistoryPositionCenter
-	}
-
-	dw, ok := w.(desktop.Window)
-	if !ok {
-		// No RequestPosition on this platform - CenterOnScreen is the best
-		// available placement for every anchor.
-		w.CenterOnScreen()
-		return
-	}
-
-	screenW, screenH, ok := screen.Size()
-	if !ok {
-		// CenterOnScreen is itself a documented no-op under Wayland, but
-		// with no screen size to compute a position from it's still the
-		// best available fallback there, and works as intended elsewhere.
-		if pos == preferences.HistoryPositionCenter {
-			w.CenterOnScreen()
-			return
-		}
-		dw.RequestPosition(historyWindowFallbackX, historyWindowFallbackY)
-		return
-	}
-
-	x, y := historyWindowOrigin(pos, screenW, screenH)
-	dw.RequestPosition(x, y)
-}
-
-// historyWindowOrigin computes the top-left corner for the history window
-// under pos, given the primary screen's size. The 9 anchors themselves come
-// from preferences.HistoryAnchors, the single shared source also used to
-// label the position dropdown in the preferences UI.
-func historyWindowOrigin(pos preferences.HistoryPosition, screenW, screenH int) (x, y int) {
-	xs := [3]int{
-		historyWindowMargin,
-		(screenW - historyWindowWidth) / 2,
-		screenW - historyWindowWidth - historyWindowMargin,
-	}
-	ys := [3]int{
-		historyWindowMargin,
-		(screenH - historyWindowHeight) / 2,
-		screenH - historyWindowHeight - historyWindowMargin,
-	}
-
-	for _, a := range preferences.HistoryAnchors {
-		if a.Position == pos {
-			return xs[a.Col], ys[a.Row]
-		}
-	}
-	return historyWindowFallbackX, historyWindowFallbackY
 }

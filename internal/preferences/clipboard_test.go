@@ -15,8 +15,25 @@ func TestDefaultsOnFirstRun(t *testing.T) {
 	if p.RecentItems != defaultRecentItems {
 		t.Fatalf("recent items = %d", p.RecentItems)
 	}
-	if p.HistoryPosition != defaultHistoryPosition {
-		t.Fatalf("history position = %q", p.HistoryPosition)
+	if p.HistoryX != defaultHistoryX || p.HistoryY != defaultHistoryY {
+		t.Fatalf("history coords = (%d, %d)", p.HistoryX, p.HistoryY)
+	}
+}
+
+func TestSetHistoryCoordsPersistsWithoutNotifying(t *testing.T) {
+	a := test.NewTempApp(t)
+	p := LoadClipboardPreferences(a)
+
+	notified := false
+	p.AddListener(func() { notified = true })
+
+	p.SetHistoryCoords(240, 360)
+
+	if notified {
+		t.Fatal("SetHistoryCoords should not notify listeners")
+	}
+	if reloaded := LoadClipboardPreferences(a); reloaded.HistoryX != 240 || reloaded.HistoryY != 360 {
+		t.Fatalf("reloaded coords = (%d, %d)", reloaded.HistoryX, reloaded.HistoryY)
 	}
 }
 
@@ -32,10 +49,9 @@ func TestSettersPersistAndNotify(t *testing.T) {
 	p.SetKeepContent(false)
 	p.SetAutoPaste(false)
 	p.SetRecentItems(7)
-	p.SetHistoryPosition(HistoryPositionTopRight)
 
-	if calls != 6 {
-		t.Fatalf("want 6 notifications, got %d", calls)
+	if calls != 5 {
+		t.Fatalf("want 5 notifications, got %d", calls)
 	}
 
 	// Reloading from the same app must see the written-through values.
@@ -45,8 +61,5 @@ func TestSettersPersistAndNotify(t *testing.T) {
 	}
 	if reloaded.RecentItems != 7 {
 		t.Fatalf("recent items = %d", reloaded.RecentItems)
-	}
-	if reloaded.HistoryPosition != HistoryPositionTopRight {
-		t.Fatalf("history position = %q", reloaded.HistoryPosition)
 	}
 }
