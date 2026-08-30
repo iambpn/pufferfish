@@ -1,0 +1,25 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+cmd = "true"
+full_bin = "go tool fyne serve"
+include_ext = ["go", "toml"]
+exclude_dir = ["tmp", "bin", "wasm", "translations", ".git", ".vscode", ".github"]
+exclude_file = ["fyne_metadata_init.go", "FyneApp.toml"]
+delay = 200
+stop_on_error = true
+send_interrupt = true
+kill_delay = "500ms"
+
+# browse http://localhost:8090 — proxy reloads the page after each restart
+[proxy]
+enabled = true
+proxy_port = 8090
+app_port = 8080
+
+[log]
+time = false
+
+[misc]
+clean_on_exit = true

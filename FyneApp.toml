@@ -1,0 +1,9 @@
+[Details]
+Icon = "Icon.png"
+Name = "pufferfish"
+ID = "pufferfish"
+Version = "0.0.1"
+Build = 17
+
+[Migrations]
+fyneDo = true

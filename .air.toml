@@ -1,0 +1,19 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+cmd = "go build -o ./tmp/pufferfish ."
+bin = "./tmp/pufferfish"
+full_bin = "./tmp/pufferfish -dev"
+include_ext = ["go", "toml"]
+exclude_dir = ["tmp", "bin", "wasm", "translations", ".git", ".vscode", ".github"]
+delay = 200
+stop_on_error = true
+send_interrupt = true
+kill_delay = "500ms"
+
+[log]
+time = false
+
+[misc]
+clean_on_exit = true

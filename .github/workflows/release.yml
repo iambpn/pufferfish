@@ -1,0 +1,72 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release tag (e.g. v0.1.0). Defaults to v<FyneApp.toml Version>."
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Resolve release tag
+        id: meta
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            TAG="${{ inputs.version }}"
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            TAG="${GITHUB_REF_NAME}"
+          else
+            TAG="v$(sed -n 's/^Version *= *"\(.*\)"/\1/p' FyneApp.toml)"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Install fyne-cross
+        run: go install github.com/fyne-io/fyne-cross@latest
+
+      - name: Cross-package Linux + Windows
+        run: |
+          fyne-cross linux  -arch=amd64,arm64 -env GOTOOLCHAIN=auto -app-id=com.iambpn.pufferfish
+          fyne-cross windows -arch=amd64       -env GOTOOLCHAIN=auto -app-id=com.iambpn.pufferfish
+
+      - name: Stage artifacts
+        run: |
+          mkdir -p release
+          for d in fyne-cross/dist/*/; do
+            platform=$(basename "$d")
+            for f in "$d"*; do
+              cp "$f" "release/${platform}-$(basename "$f")"
+            done
+          done
+          ls -l release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pufferfish-packages
+          path: release/*
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.meta.outputs.tag }}" release/* \
+            --title "${{ steps.meta.outputs.tag }}" \
+            --generate-notes
