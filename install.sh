@@ -14,7 +14,8 @@
 # AUTOSTART_DIR (default /etc/xdg/autostart).
 #
 # Installing also drops a system-wide XDG autostart entry so the tray app
-# starts on login for every user; uninstall removes it.
+# starts on login for every user, adds a launcher to the applications menu,
+# and places a shortcut on each real user's Desktop; uninstall removes them.
 
 set -eu
 
@@ -27,6 +28,10 @@ BIN_DST="$PREFIX/bin/$APP"
 DESKTOP_DST="$PREFIX/share/applications/$APP.desktop"
 ICON_DST="$PREFIX/share/pixmaps/$APP.png"
 AUTOSTART_DST="$AUTOSTART_DIR/$APP.desktop"
+
+# Icon reference written into .desktop files; downgraded to a bare name
+# when no icon file ships in the archive.
+ICON="$ICON_DST"
 
 die() { echo "install.sh: $*" >&2; exit 1; }
 
@@ -58,29 +63,64 @@ refresh_desktop_db() {
 	update-desktop-database "$PREFIX/share/applications" 2>/dev/null || true
 }
 
+desktop_entry() {
+	cat <<EOF
+[Desktop Entry]
+Type=Application
+Name=Pufferfish
+Comment=Clipboard manager
+Exec=$BIN_DST
+Icon=$ICON
+Terminal=false
+Categories=Utility;
+EOF
+}
+
+# Print "user home" for each real login user (uid 1000-59999 with a home dir).
+real_users() {
+	getent passwd 2>/dev/null | awk -F: '$3>=1000 && $3<60000 && $6 ~ /^\// {print $1" "$6}'
+}
+
+install_menu_entry() {
+	mkdir -p "$(dirname "$DESKTOP_DST")" 2>/dev/null || true
+	desktop_entry >"$DESKTOP_DST"
+	chmod 644 "$DESKTOP_DST"
+	echo "menu entry -> $DESKTOP_DST"
+}
+
+install_desktop_shortcuts() {
+	real_users | while read -r user home; do
+		dir="$home/Desktop"
+		[ -d "$dir" ] || mkdir -p "$dir" 2>/dev/null || continue
+		dst="$dir/$APP.desktop"
+		desktop_entry >"$dst" || continue
+		chmod 755 "$dst"
+		chown "$user" "$dst" 2>/dev/null || true
+		command -v gio >/dev/null 2>&1 &&
+			sudo -u "$user" gio set "$dst" metadata::trusted true 2>/dev/null || true
+		echo "desktop shortcut -> $dst"
+	done
+}
+
 install_autostart() {
 	mkdir -p "$AUTOSTART_DIR" 2>/dev/null || true
 	[ -w "$AUTOSTART_DIR" ] || {
 		echo "install.sh: $AUTOSTART_DIR not writable; skipping autostart entry" >&2
 		return 0
 	}
-	cat >"$AUTOSTART_DST" <<EOF
-[Desktop Entry]
-Type=Application
-Name=Pufferfish
-Comment=Clipboard manager
-Exec=$BIN_DST
-Icon=$ICON_DST
-Terminal=false
-Categories=Utility;
-X-GNOME-Autostart-enabled=true
-EOF
+	{ desktop_entry; echo "X-GNOME-Autostart-enabled=true"; } >"$AUTOSTART_DST"
 	chmod 644 "$AUTOSTART_DST"
 	echo "autostart entry -> $AUTOSTART_DST"
 }
 
 remove_autostart() {
 	rm -f "$AUTOSTART_DST"
+}
+
+remove_desktop_shortcuts() {
+	real_users | while read -r _ home; do
+		rm -f "$home/Desktop/$APP.desktop"
+	done
 }
 
 resolve_arch() {
@@ -150,12 +190,16 @@ do_install() {
 
 	bin_src="$(find "$ex" -type f -path "*/bin/$APP" -print -quit)"
 	[ -n "$bin_src" ] || die "no $APP binary inside $(basename "$archive")"
-	desktop_src="$(find "$ex" -type f -name "$APP.desktop" -print -quit)"
 	icon_src="$(find "$ex" -type f -name "$APP.png" -print -quit)"
 
 	install -Dm755 "$bin_src" "$BIN_DST"
-	[ -n "$desktop_src" ] && install -Dm644 "$desktop_src" "$DESKTOP_DST" || true
-	[ -n "$icon_src" ] && install -Dm644 "$icon_src" "$ICON_DST" || true
+	if [ -n "$icon_src" ]; then
+		install -Dm644 "$icon_src" "$ICON_DST"
+	else
+		ICON="$APP"
+	fi
+	install_menu_entry
+	install_desktop_shortcuts
 	refresh_desktop_db
 	install_autostart
 
@@ -166,6 +210,7 @@ do_uninstall() {
 	need_writable
 	rm -f "$BIN_DST" "$DESKTOP_DST" "$ICON_DST"
 	remove_autostart
+	remove_desktop_shortcuts
 	refresh_desktop_db
 	echo "removed $APP from $PREFIX"
 }
