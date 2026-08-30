@@ -10,17 +10,23 @@
 # With no ARCHIVE the script downloads the matching-arch release tarball
 # from GitHub. A local *pufferfish*.tar.xz next to the script is used
 # instead when present. Env overrides: PREFIX (default /usr/local),
-# PUFFERFISH_REPO (default iambpn/pufferfish), PUFFERFISH_VERSION.
+# PUFFERFISH_REPO (default iambpn/pufferfish), PUFFERFISH_VERSION,
+# AUTOSTART_DIR (default /etc/xdg/autostart).
+#
+# Installing also drops a system-wide XDG autostart entry so the tray app
+# starts on login for every user; uninstall removes it.
 
 set -eu
 
 APP=pufferfish
 PREFIX="${PREFIX:-/usr/local}"
 REPO="${PUFFERFISH_REPO:-iambpn/pufferfish}"
+AUTOSTART_DIR="${AUTOSTART_DIR:-/etc/xdg/autostart}"
 
 BIN_DST="$PREFIX/bin/$APP"
 DESKTOP_DST="$PREFIX/share/applications/$APP.desktop"
 ICON_DST="$PREFIX/share/pixmaps/$APP.png"
+AUTOSTART_DST="$AUTOSTART_DIR/$APP.desktop"
 
 die() { echo "install.sh: $*" >&2; exit 1; }
 
@@ -34,7 +40,8 @@ Install or uninstall a Pufferfish Linux release build.
 
   sudo ./install.sh [ARCHIVE|VERSION|uninstall]          same, run locally
 
-Env: PREFIX (default /usr/local), PUFFERFISH_REPO, PUFFERFISH_VERSION.
+Env: PREFIX (default /usr/local), PUFFERFISH_REPO, PUFFERFISH_VERSION,
+     AUTOSTART_DIR (default /etc/xdg/autostart).
 EOF
 }
 
@@ -49,6 +56,31 @@ need_writable() {
 refresh_desktop_db() {
 	command -v update-desktop-database >/dev/null 2>&1 || return 0
 	update-desktop-database "$PREFIX/share/applications" 2>/dev/null || true
+}
+
+install_autostart() {
+	mkdir -p "$AUTOSTART_DIR" 2>/dev/null || true
+	[ -w "$AUTOSTART_DIR" ] || {
+		echo "install.sh: $AUTOSTART_DIR not writable; skipping autostart entry" >&2
+		return 0
+	}
+	cat >"$AUTOSTART_DST" <<EOF
+[Desktop Entry]
+Type=Application
+Name=Pufferfish
+Comment=Clipboard manager
+Exec=$BIN_DST
+Icon=$ICON_DST
+Terminal=false
+Categories=Utility;
+X-GNOME-Autostart-enabled=true
+EOF
+	chmod 644 "$AUTOSTART_DST"
+	echo "autostart entry -> $AUTOSTART_DST"
+}
+
+remove_autostart() {
+	rm -f "$AUTOSTART_DST"
 }
 
 resolve_arch() {
@@ -125,6 +157,7 @@ do_install() {
 	[ -n "$desktop_src" ] && install -Dm644 "$desktop_src" "$DESKTOP_DST" || true
 	[ -n "$icon_src" ] && install -Dm644 "$icon_src" "$ICON_DST" || true
 	refresh_desktop_db
+	install_autostart
 
 	echo "installed $APP -> $BIN_DST (from $(basename "$archive"))"
 }
@@ -132,6 +165,7 @@ do_install() {
 do_uninstall() {
 	need_writable
 	rm -f "$BIN_DST" "$DESKTOP_DST" "$ICON_DST"
+	remove_autostart
 	refresh_desktop_db
 	echo "removed $APP from $PREFIX"
 }
