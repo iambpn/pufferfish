@@ -29,6 +29,7 @@ func NewHistorySection(store *clipboard.Store, onSelect func(clipboard.Item), on
 
 	list := newHistoryList(store, onSelect)
 	listNoShadow := container.NewThemeOverride(list, noScrollShadowTheme{Theme: theme.DefaultTheme()})
+
 	refresh := func() {
 		list.Refresh()
 		if store.Len() == 0 {

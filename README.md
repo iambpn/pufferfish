@@ -1,5 +1,8 @@
 # Pufferfish
 
+<img src="./Icon.png" alt="Pufferfish Icon" width="200">
+
+
 A cross platform clipboard manager similar to diodon.
 
 Pufferfish lives in the system tray and records what you copy. Open the

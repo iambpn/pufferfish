@@ -55,6 +55,7 @@ func main() {
 
 	store := clipboard.NewStore(storageDir(a))
 	store.Load()
+
 	// A save triggered by the last change before quitting is written in the
 	// background; without waiting for it here, it could still be in flight
 	// when the process exits and never make it to disk.
