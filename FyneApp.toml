@@ -2,8 +2,8 @@
 Icon = "Icon.png"
 Name = "pufferfish"
 ID = "pufferfish"
-Version = "0.0.1"
-Build = 17
+Version = "0.0.2"
+Build = 18
 
 [Migrations]
 fyneDo = true

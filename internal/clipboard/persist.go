@@ -32,16 +32,16 @@ func (s *Store) Load() {
 	}
 
 	s.mu.Lock()
-	s.items = s.keepReadableLocked(items)
+	s.items = s.dropMissingImagesLocked(items)
 	s.trimLocked()
 	s.mu.Unlock()
 
 	s.notify()
 }
 
-// keepReadableLocked drops entries whose image file went missing while the
-// app was closed, so the list never shows a broken card.
-func (s *Store) keepReadableLocked(items []Item) []Item {
+// dropMissingImagesLocked drops entries whose image file went missing while
+// the app was closed, so the list never shows a broken card.
+func (s *Store) dropMissingImagesLocked(items []Item) []Item {
 	kept := items[:0]
 	for _, item := range items {
 		if item.Kind == KindImage {

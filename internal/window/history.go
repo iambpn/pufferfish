@@ -39,6 +39,7 @@ func NewHistoryWindow(
 	return func() {
 		sw.Open(func(onClosed func()) fyne.Window {
 			w := a.Driver().(desktop.Driver).CreateSplashWindow()
+			w.SetTitle("Pufferfish History")
 
 			selectItem := func(item clipboard.Item) {
 				if err := watcher.Put(item); err != nil {
@@ -55,12 +56,16 @@ func NewHistoryWindow(
 
 			clearAll := func() { clipboard.ClearAll(store, watcher) }
 
-			content, detach := ui.NewHistorySection(store, selectItem, w.Close, clearAll)
+			content, detachListeners := ui.NewHistorySection(store, selectItem, w.Close, clearAll)
+
 			w.SetOnClosed(func() {
-				detach()
+				// clean up the listeners and resource on close
+				detachListeners()
 				onClosed()
 				a.Lifecycle().SetOnExitedForeground(nil)
 			})
+
+			// set the listener to close the window when focus is lost
 			a.Lifecycle().SetOnExitedForeground(w.Close)
 
 			// The window has no title bar, so wrap its content in a mover
@@ -84,6 +89,7 @@ func NewHistoryWindow(
 				),
 			)
 
+			// setting up close on escape key press
 			w.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
 				if ev.Name == fyne.KeyEscape {
 					w.Close()
@@ -92,6 +98,7 @@ func NewHistoryWindow(
 
 			w.Resize(fyne.NewSize(historyWindowWidth, historyWindowHeight))
 			w.Show()
+
 			// A splash window centers itself the first time it's shown,
 			// which would override an earlier RequestPosition, so restore
 			// the saved position only now that centering has happened.

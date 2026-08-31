@@ -73,6 +73,7 @@ Exec=$BIN_DST
 Icon=$ICON
 Terminal=false
 Categories=Utility;
+StartupWMClass=$APP
 EOF
 }
 
@@ -190,13 +191,25 @@ do_install() {
 
 	bin_src="$(find "$ex" -type f -path "*/bin/$APP" -print -quit)"
 	[ -n "$bin_src" ] || die "no $APP binary inside $(basename "$archive")"
-	icon_src="$(find "$ex" -type f -name "$APP.png" -print -quit)"
+
+	# The packaged icon is named after the app id, so don't assume a fixed
+	# filename: take whatever PNG ships under share/pixmaps. Fetch the repo
+	# icon as a fallback so the .desktop never points at a bare name the
+	# icon theme can't resolve (which is what shows a generic placeholder).
+	icon_src="$(find "$ex" -type f -path "*/share/pixmaps/*.png" -print -quit)"
+	[ -n "$icon_src" ] || icon_src="$(find "$ex" -type f -name "*.png" -print -quit)"
+	if [ -z "$icon_src" ] &&
+		{ command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1; }; then
+		fetch_file "https://raw.githubusercontent.com/$REPO/main/Icon.png" \
+			"$tmp/icon.png" 2>/dev/null && icon_src="$tmp/icon.png"
+	fi
 
 	install -Dm755 "$bin_src" "$BIN_DST"
 	if [ -n "$icon_src" ]; then
 		install -Dm644 "$icon_src" "$ICON_DST"
 	else
 		ICON="$APP"
+		echo "install.sh: no icon file found; .desktop will reference '$APP'" >&2
 	fi
 	install_menu_entry
 	install_desktop_shortcuts

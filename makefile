@@ -1,8 +1,11 @@
 .PHONY: run dev build test vet fmt tidy clean wasm-build serve package \
         package-linux package-windows package-darwin package-all help
 
+# APP_ID must match the ID in FyneApp.toml so dev builds (which read the
+# toml), packaged builds, and the installed .desktop all agree on one
+# identity - otherwise the desktop can't map a window to its icon.
 APP_NAME   := pufferfish
-APP_ID     := com.iambpn.pufferfish
+APP_ID     := pufferfish
 BIN_DIR    := bin
 AIR        := $(shell go env GOPATH)/bin/air
 FYNE_CROSS := $(shell go env GOPATH)/bin/fyne-cross

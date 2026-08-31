@@ -71,6 +71,9 @@ func (s *Store) AddListener(fn func()) (remove func()) {
 	}
 }
 
+// notify runs each registered listener so the UI can refresh itself after
+// the history changes. Callers invoke it after releasing the lock, so a
+// listener may call back into the store.
 func (s *Store) notify() {
 	s.listenerMu.Lock()
 	fns := make([]func(), 0, len(s.listeners))
