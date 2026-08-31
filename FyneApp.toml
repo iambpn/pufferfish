@@ -1,7 +1,7 @@
 [Details]
 Icon = "Icon.png"
 Name = "pufferfish"
-ID = "pufferfish"
+ID = "com.iambpn.pufferfish"
 Version = "0.0.2"
 Build = 18
 

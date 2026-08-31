@@ -43,8 +43,8 @@ jobs:
 
       - name: Cross-package Linux + Windows
         run: |
-          fyne-cross linux  -arch=amd64,arm64 -env GOTOOLCHAIN=auto -app-id=pufferfish
-          fyne-cross windows -arch=amd64       -env GOTOOLCHAIN=auto -app-id=pufferfish
+          fyne-cross linux  -arch=amd64,arm64 -env GOTOOLCHAIN=auto -app-id=com.iambpn.pufferfish
+          fyne-cross windows -arch=amd64       -env GOTOOLCHAIN=auto -app-id=com.iambpn.pufferfish
 
       - name: Stage artifacts
         run: |
