@@ -2,7 +2,7 @@
 Icon = "Icon.png"
 Name = "pufferfish"
 ID = "com.iambpn.pufferfish"
-Version = "0.0.2"
+Version = "0.0.3"
 Build = 18
 
 [Migrations]
