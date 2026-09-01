@@ -11,7 +11,6 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
 
 concurrency:
   group: release-${{ github.ref }}
@@ -71,26 +70,3 @@ jobs:
           gh release create "${{ steps.meta.outputs.tag }}" release/* \
             --title "${{ steps.meta.outputs.tag }}" \
             --generate-notes
-
-      - name: Open build-number bump PR
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          CURRENT=$(sed -n 's/^Build *= *\([0-9][0-9]*\).*/\1/p' FyneApp.toml)
-          NEXT=$((CURRENT + 1))
-          sed -i "s/^Build *=.*/Build = $NEXT/" FyneApp.toml
-
-          BRANCH="chore/build-$NEXT"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git switch -c "$BRANCH"
-          git add FyneApp.toml
-          git commit -m "chore: bump build number to $NEXT [skip ci]"
-          git push -f origin "$BRANCH"
-
-          gh pr create \
-            --base "${{ github.event.repository.default_branch }}" \
-            --head "$BRANCH" \
-            --title "chore: bump build number to $NEXT" \
-            --body "Automated bump of \`Build\` in FyneApp.toml to $NEXT after release ${{ steps.meta.outputs.tag }}." \
-            || echo "A PR for $BRANCH already exists."
