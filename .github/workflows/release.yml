@@ -20,11 +20,11 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
-          go-version-file: go.mod
+          go-version-file: "go.mod"
 
       - name: Resolve release tag
         id: meta
@@ -41,20 +41,10 @@ jobs:
       - name: Install fyne-cross
         run: go install github.com/fyne-io/fyne-cross@latest
 
-      # Pre-fetch modules so packaging emits no "go: downloading ..." lines.
-      # fyne merges stdout+stderr of `go mod edit -json` and parses it as JSON,
-      # so any stray `go:` line breaks metadata injection
-      # ("invalid character 'g' looking for beginning of value").
-      - name: Warm module cache
-        run: go mod download
-
-      # GOTOOLCHAIN=local (not auto) stops `go: downloading go1.x` toolchain
-      # lines from corrupting that same JSON parse. setup-go already installs
-      # the exact version from go.mod.
       - name: Cross-package Linux + Windows
         run: |
-          fyne-cross linux  -arch=amd64,arm64 -env GOTOOLCHAIN=local -app-id=com.iambpn.pufferfish
-          fyne-cross windows -arch=amd64       -env GOTOOLCHAIN=local -app-id=com.iambpn.pufferfish
+          fyne-cross linux -arch=amd64,arm64 -env GOTOOLCHAIN=auto -release
+          fyne-cross windows -arch=amd64 -env GOTOOLCHAIN=auto -release
 
       - name: Stage artifacts
         run: |
@@ -67,7 +57,7 @@ jobs:
           done
           ls -l release
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: pufferfish-packages
           path: release/*

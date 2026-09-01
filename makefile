@@ -5,13 +5,15 @@
 # Windows target, so both use this reverse-DNS form). The installed
 # .desktop matches windows via StartupWMClass=pufferfish (Fyne's Name field).
 APP_NAME   := pufferfish
-APP_ID     := com.iambpn.pufferfish
 BIN_DIR    := bin
 AIR        := $(shell go env GOPATH)/bin/air
-FYNE_CROSS := $(shell go env GOPATH)/bin/fyne-cross
+
+# Installed into this project's bin/ (via GOBIN), not the global GOPATH/bin.
+FYNE_CROSS := $(CURDIR)/$(BIN_DIR)/fyne-cross
+
 # go.mod pins a newer Go than the fyne-cross images ship, so let the
 # container fetch the matching toolchain.
-FYNE_CROSS_ENV := -env GOTOOLCHAIN=auto -app-id=$(APP_ID)
+FYNE_CROSS_ENV := -env GOTOOLCHAIN=auto
 
 help:
 	@echo "Available targets:"
@@ -68,18 +70,19 @@ package:
 	go tool fyne package -os $(shell go env GOOS)
 
 $(FYNE_CROSS):
-	go install github.com/fyne-io/fyne-cross@latest
+	mkdir -p $(BIN_DIR)
+	GOBIN=$(CURDIR)/$(BIN_DIR) go install github.com/fyne-io/fyne-cross@latest
 
 package-linux: $(FYNE_CROSS)
-	$(FYNE_CROSS) linux -arch=amd64,arm64 $(FYNE_CROSS_ENV)
+	$(FYNE_CROSS) linux -arch=amd64,arm64 -release $(FYNE_CROSS_ENV)
 
 package-windows: $(FYNE_CROSS)
-	$(FYNE_CROSS) windows -arch=amd64 $(FYNE_CROSS_ENV)
+	$(FYNE_CROSS) windows -arch=amd64 -release $(FYNE_CROSS_ENV)
 
 # macOS cross-builds need an Apple macOSX SDK; point FYNE_CROSS_MACOS_SDK
 # at an extracted SDK dir (Apple's licence only allows this on a Mac).
 package-darwin: $(FYNE_CROSS)
-	$(FYNE_CROSS) darwin -arch=amd64,arm64 $(FYNE_CROSS_ENV) \
+	$(FYNE_CROSS) darwin -arch=amd64,arm64 -release $(FYNE_CROSS_ENV) \
 		-macosx-sdk-path "$(FYNE_CROSS_MACOS_SDK)"
 
 package-all: package-linux package-windows package-darwin
