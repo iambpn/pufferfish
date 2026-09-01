@@ -3,7 +3,13 @@ Icon = "Icon.png"
 Name = "pufferfish"
 ID = "com.iambpn.pufferfish"
 Version = "0.0.3"
-Build = 18
+Build = 22
+
+[LinuxAndBSD]
+GenericName = "Clipboard Manager"
+Categories = ["Utility"]
+Comment = "Keep a history of what you copy and put earlier items back on the clipboard"
+Keywords = ["clipboard", "history", "manager", "copy", "paste", "tray"]
 
 [Migrations]
 fyneDo = true
