@@ -43,8 +43,8 @@ jobs:
 
       - name: Cross-package Linux + Windows
         run: |
-          fyne-cross linux -arch=amd64,arm64 -env GOTOOLCHAIN=auto -release
-          fyne-cross windows -arch=amd64 -env GOTOOLCHAIN=auto -release
+          fyne-cross linux -arch=amd64,arm64 -env GOTOOLCHAIN=auto
+          fyne-cross windows -arch=amd64 -env GOTOOLCHAIN=auto
 
       - name: Stage artifacts
         run: |
