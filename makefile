@@ -11,10 +11,6 @@ AIR        := $(shell go env GOPATH)/bin/air
 # Installed into this project's bin/ (via GOBIN), not the global GOPATH/bin.
 FYNE_CROSS := $(CURDIR)/$(BIN_DIR)/fyne-cross
 
-# go.mod pins a newer Go than the fyne-cross images ship, so let the
-# container fetch the matching toolchain.
-FYNE_CROSS_ENV := -env GOTOOLCHAIN=auto
-
 help:
 	@echo "Available targets:"
 	@echo "  run          Run the app locally"
@@ -74,15 +70,15 @@ $(FYNE_CROSS):
 	GOBIN=$(CURDIR)/$(BIN_DIR) go install github.com/fyne-io/fyne-cross@latest
 
 package-linux: $(FYNE_CROSS)
-	$(FYNE_CROSS) linux -arch=amd64,arm64 -release $(FYNE_CROSS_ENV)
+	$(FYNE_CROSS) linux -arch=amd64,arm64 -release
 
 package-windows: $(FYNE_CROSS)
-	$(FYNE_CROSS) windows -arch=amd64 -release $(FYNE_CROSS_ENV)
+	$(FYNE_CROSS) windows -arch=amd64 -release
 
 # macOS cross-builds need an Apple macOSX SDK; point FYNE_CROSS_MACOS_SDK
 # at an extracted SDK dir (Apple's licence only allows this on a Mac).
 package-darwin: $(FYNE_CROSS)
-	$(FYNE_CROSS) darwin -arch=amd64,arm64 -release $(FYNE_CROSS_ENV) \
+	$(FYNE_CROSS) darwin -arch=amd64,arm64 -release \
 		-macosx-sdk-path "$(FYNE_CROSS_MACOS_SDK)"
 
 package-all: package-linux package-windows package-darwin
