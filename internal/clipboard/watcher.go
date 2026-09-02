@@ -91,8 +91,10 @@ func (w *Watcher) handle(data system.Data) {
 		return
 	}
 
-	// The store is only ever mutated on the UI goroutine, so the windows
-	// bound to it can refresh straight from its change notification.
+	// The store is only ever changed on the UI goroutine, so windows bound
+	// to it can refresh straight from its change notification. Work that
+	// does not touch the store - decoding and resizing an image - stays
+	// here on the watch goroutine.
 	switch data.Format {
 	case system.FmtText:
 		text := string(data.Bytes)
@@ -101,8 +103,11 @@ func (w *Watcher) handle(data system.Data) {
 		if !w.capturesImages() {
 			return
 		}
-		png := data.Bytes
-		fyne.Do(func() { w.store.AddImage(png) })
+		item, ok := w.store.PrepareImage(data.Bytes)
+		if !ok {
+			return
+		}
+		fyne.Do(func() { w.store.Add(item) })
 	}
 }
 

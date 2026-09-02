@@ -19,10 +19,17 @@ const (
 // Item is a single captured clipboard entry. Image bytes are not held here:
 // they are written to a file in the store's directory and referenced by
 // ImageFile, so a long history stays cheap in memory and on reload.
+//
+// ThumbFile is a small downscaled copy saved next to the image. History
+// cards draw this instead of the original, so Fyne never has to decode a
+// full-size image just to show a tiny thumbnail. It is empty for images
+// saved before thumbnails existed, or when writing the thumbnail failed;
+// ThumbPath then falls back to the original.
 type Item struct {
 	Kind       Kind      `json:"kind"`
 	Text       string    `json:"text,omitempty"`
 	ImageFile  string    `json:"imageFile,omitempty"`
+	ThumbFile  string    `json:"thumbFile,omitempty"`
 	Width      int       `json:"width,omitempty"`
 	Height     int       `json:"height,omitempty"`
 	Hash       string    `json:"hash"`
