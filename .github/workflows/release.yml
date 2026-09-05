@@ -42,9 +42,13 @@ jobs:
         run: go install github.com/fyne-io/fyne-cross@latest
 
       - name: Cross-package Linux + Windows
+        # No -ldflags here: fyne-cross forwards the value into the container
+        # with quotes intact, so a value with a space ("-s -w") reaches the
+        # linker as `-w"` and it aborts. fyne already passes `-w -s` for a
+        # non-debug build, so the symbol table and DWARF are dropped anyway.
         run: |
-          fyne-cross linux -arch=amd64,arm64 -ldflags="-s -w"
-          fyne-cross windows -arch=amd64 -ldflags="-s -w"
+          fyne-cross linux -arch=amd64,arm64
+          fyne-cross windows -arch=amd64
 
       - name: Stage artifacts
         run: |
