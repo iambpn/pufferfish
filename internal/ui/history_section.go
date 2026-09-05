@@ -88,7 +88,7 @@ func newHistoryList(store *clipboard.Store, onSelect func(clipboard.Item)) *widg
 				return
 			}
 
-			imagePath, _ := store.ImagePath(item)
+			imagePath, _ := store.ThumbPath(item)
 			card := obj.(*historyCard)
 			card.setItem(item, imagePath)
 			card.onTap = func() { onSelect(item) }
@@ -99,10 +99,11 @@ func newHistoryList(store *clipboard.Store, onSelect func(clipboard.Item)) *widg
 	return list
 }
 
-// noScrollShadowTheme suppresses the drop shadow Fyne's scroll container
-// draws at whichever edge has more content to reveal. With cards already
-// touching the flyout's own edges, that shadow reads as a stray smudge over
-// the top card rather than a scroll cue, so it's turned fully transparent.
+// noScrollShadowTheme hides the drop shadow that Fyne's scroll container
+// draws at the edge where more content can be scrolled into view. The
+// cards already reach the flyout's edges, so that shadow looks like a
+// smudge over the top card instead of a scroll hint. Making the shadow
+// color transparent removes it.
 type noScrollShadowTheme struct {
 	fyne.Theme
 }

@@ -32,11 +32,11 @@ type Store struct {
 	nextID     int
 	listeners  map[int]func()
 
-	// saveMu/saveSeq/savedSeq coordinate the background writes saveLocked
-	// dispatches, so the disk write never blocks the caller (typically the
-	// UI goroutine, via fyne.Do) while still landing in the same order the
-	// in-memory state changed, and never lets a slow write clobber a faster
-	// one for a state that's since been superseded. See saveLocked.
+	// saveMu, saveSeq and savedSeq coordinate the background disk writes
+	// started by saveLocked. They keep the writes off the caller's
+	// goroutine (usually the UI one, via fyne.Do), keep them in the order
+	// the state changed, and stop a slow write from overwriting a newer
+	// one. See saveLocked.
 	saveMu   sync.Mutex
 	saveSeq  uint64
 	savedSeq uint64
@@ -137,6 +137,20 @@ func (s *Store) ImagePath(item Item) (string, bool) {
 	return path, true
 }
 
+// ThumbPath resolves the small image a history card should draw for item.
+// It falls back to the full-resolution file for entries with no thumbnail,
+// and reports false for text items and for images whose file is gone.
+func (s *Store) ThumbPath(item Item) (string, bool) {
+	if item.Kind != KindImage || item.ThumbFile == "" || s.dir == "" {
+		return s.ImagePath(item)
+	}
+	path := filepath.Join(s.dir, item.ThumbFile)
+	if _, err := os.Stat(path); err != nil {
+		return s.ImagePath(item)
+	}
+	return path, true
+}
+
 // Add records a newly captured item at the front of the history. Re-copying
 // something already in the history moves it back to the front rather than
 // duplicating it.
@@ -151,6 +165,13 @@ func (s *Store) Add(item Item) {
 		// to the front with the new capture time.
 		if item.ImageFile != existing.ImageFile {
 			s.removeFileFor(item)
+		}
+		// An entry created before thumbnails were available won't have one, while
+		// the newly prepared copy does. Use it instead of discarding it, which
+		// would otherwise leave an unreferenced file behind and keep the card
+		// rendering the full-resolution image.
+		if existing.ThumbFile == "" {
+			existing.ThumbFile = item.ThumbFile
 		}
 		existing.CapturedAt = item.CapturedAt
 		item = existing
@@ -234,8 +255,13 @@ func (s *Store) trimLocked() bool {
 }
 
 func (s *Store) removeFileFor(item Item) {
-	if item.Kind != KindImage || item.ImageFile == "" || s.dir == "" {
+	if item.Kind != KindImage || s.dir == "" {
 		return
 	}
-	os.Remove(filepath.Join(s.dir, item.ImageFile))
+	if item.ImageFile != "" {
+		os.Remove(filepath.Join(s.dir, item.ImageFile))
+	}
+	if item.ThumbFile != "" {
+		os.Remove(filepath.Join(s.dir, item.ThumbFile))
+	}
 }

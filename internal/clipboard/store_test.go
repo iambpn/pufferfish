@@ -250,3 +250,33 @@ func TestPreview(t *testing.T) {
 		t.Fatalf("got %q", got)
 	}
 }
+
+// TestRecopyingAnOldImageAdoptsItsNewThumbnail covers an entry saved before
+// thumbnails existed: the dedup path keeps the existing entry, so without
+// this the freshly written thumbnail is orphaned on disk and the card goes
+// on rendering the full-resolution image.
+func TestRecopyingAnOldImageAdoptsItsNewThumbnail(t *testing.T) {
+	dir := t.TempDir()
+	s := NewStore(dir)
+	t.Cleanup(s.Flush)
+
+	data := pngBytes(t, 300, 300, color.Black)
+	s.AddImage(data)
+
+	// Rewrite history as an older version would have left it.
+	s.mu.Lock()
+	thumb := s.items[0].ThumbFile
+	s.items[0].ThumbFile = ""
+	s.mu.Unlock()
+	os.Remove(filepath.Join(dir, thumb))
+
+	s.AddImage(data)
+
+	item := s.Items()[0]
+	if item.ThumbFile == "" {
+		t.Fatal("the re-copied image did not adopt its new thumbnail")
+	}
+	if _, err := os.Stat(filepath.Join(dir, item.ThumbFile)); err != nil {
+		t.Fatalf("adopted thumbnail is not on disk: %v", err)
+	}
+}

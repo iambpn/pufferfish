@@ -44,16 +44,27 @@ func newHistoryCard() *historyCard {
 	return c
 }
 
-// setItem points the card at an item. imagePath is the file backing an
-// image item, or empty for text.
+// setItem points the card at an item. imagePath is the downscaled file
+// backing an image item, or empty for text.
 func (c *historyCard) setItem(item clipboard.Item, imagePath string) {
 	c.content.SetText(item.Preview())
 
 	if imagePath == "" {
+		// This card is being reused for a text row. Clear the old image
+		// so its decoded pixels are not kept for a row that never shows
+		// them.
+		c.thumb.File = ""
+		c.thumb.Image = nil
 		c.thumb.Hide()
 		return
 	}
-	c.thumb.File = imagePath
+	if c.thumb.File != imagePath {
+		// Fyne holds on to the old decoded image until the new file is
+		// drawn. Clearing it first means a reused card keeps only one
+		// image in memory at a time.
+		c.thumb.Image = nil
+		c.thumb.File = imagePath
+	}
 	c.thumb.Show()
 	c.thumb.Refresh()
 }
