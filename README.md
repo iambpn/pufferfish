@@ -9,6 +9,20 @@ Pufferfish lives in the system tray and records what you copy. Open the
 history to put an earlier item back on the clipboard; picking an item also
 moves it to the front, as if it had just been copied.
 
+## Preview
+
+### Clipboard history
+
+<img src="./preivew/History%20UI%20-%20Preview.png" alt="Pufferfish clipboard history window" width="420">
+
+### Preferences
+
+<img src="./preivew/Preference%20UI%20-%20Preview.png" alt="Pufferfish preferences window" width="520">
+
+### Tray menu
+
+<img src="./preivew/Tray%20Menu%20-%20Preview.png" alt="Pufferfish system tray menu" width="300">
+
 ## Installation
 
 Download the latest release from the [releases page](https://github.com/iambpn/pufferfish/releases).
@@ -115,8 +129,8 @@ via `systemctl --user start ydotoold`, then by running `ydotoold` directly
 — waits for it to serve, and sends the keystroke again. It never escalates
 privileges, and never stops the daemon: other tools share it.
 
-`ydotoold` needs write access to `/dev/uinput`. If it will not start, add
-the udev rule below, then log out and back in:
+The `ydotoold` daemon needs permission to write to `/dev/uinput`. If the
+daemon does not start, add the udev rule below, then log out and back in:
 
 ```sh
 sudo tee /etc/udev/rules.d/99-uinput.rules <<'RULE'
