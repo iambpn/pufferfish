@@ -150,6 +150,9 @@ sudo usermod -aG input "$USER"
 sudo udevadm control --reload-rules && sudo udevadm trigger
 ```
 
+`usermod` only applies to new login sessions, so log out and back in (or
+reboot) before trying to paste again — a new terminal window is not enough.
+
 ### macOS
 
 macOS blocks synthetic keystrokes until the app is trusted. Add Pufferfish
