@@ -130,12 +130,22 @@ via `systemctl --user start ydotoold`, then by running `ydotoold` directly
 privileges, and never stops the daemon: other tools share it.
 
 The `ydotoold` daemon needs permission to write to `/dev/uinput`. If the
-daemon does not start, add the udev rule below, then log out and back in:
+daemon does not start, first check if a rule for `uinput` already exists:
 
 ```sh
-sudo tee /etc/udev/rules.d/99-uinput.rules <<'RULE'
-KERNEL=="uinput", GROUP="input", MODE="0660"
-RULE
+grep -r uinput /usr/lib/udev/rules.d/ /etc/udev/rules.d/ 2>/dev/null
+```
+
+Many distros already ship one (often as `80-uinput.rules`) that sets
+`GROUP="input"`. If nothing turns up, add the rule below:
+
+```sh
+echo 'KERNEL=="uinput", GROUP="input", MODE="0660"' | sudo tee /etc/udev/rules.d/99-uinput.rules
+```
+
+Either way, add the user to the `input` group and reload the rules:
+
+```sh
 sudo usermod -aG input "$USER"
 sudo udevadm control --reload-rules && sudo udevadm trigger
 ```
