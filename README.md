@@ -54,12 +54,16 @@ place of a download when present. Set `PREFIX` to install somewhere other
 than `/usr/local`.
 
 The installer also adds a system-wide autostart entry
-(`/etc/xdg/autostart/pufferfish.desktop`) so the tray app starts on
+(`/etc/xdg/autostart/com.iambpn.pufferfish.desktop`) so the tray app starts on
 login, the applications-menu launcher installed by the Makefile
 (`/usr/local/share/applications/com.iambpn.pufferfish.desktop`), and a
 `pufferfish.desktop` shortcut on the Desktop of every real user (marked
 trusted for GNOME). The autostart entry and Desktop shortcuts use an
-absolute `Exec=` path. `uninstall` removes all of them; set
+absolute `Exec=` path. The autostart entry uses the same desktop ID as the
+applications-menu launcher, is hidden from app lists with `NoDisplay=true`,
+and remains enabled with `X-GNOME-Autostart-enabled=true`. Upgrading removes
+the old `/etc/xdg/autostart/pufferfish.desktop` entry. `uninstall` removes all
+of them; set
 `AUTOSTART_DIR` to change the autostart location.
 
 ## Opening the history
