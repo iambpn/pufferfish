@@ -2,8 +2,8 @@
 Icon = "Icon.png"
 Name = "pufferfish"
 ID = "com.iambpn.pufferfish"
-Version = "0.0.4"
-Build = 23
+Version = "0.0.5"
+Build = 24
 
 [LinuxAndBSD]
 GenericName = "Clipboard Manager"
