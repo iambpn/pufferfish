@@ -47,6 +47,7 @@ build:
 
 test:
 	go test ./...
+	sh ./install_test.sh
 
 vet:
 	go vet ./...

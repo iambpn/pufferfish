@@ -25,12 +25,14 @@
 set -eu
 
 APP=pufferfish
+APP_ID=com.iambpn.pufferfish
 PREFIX="${PREFIX:-/usr/local}"
 REPO="${PUFFERFISH_REPO:-iambpn/pufferfish}"
 AUTOSTART_DIR="${AUTOSTART_DIR:-/etc/xdg/autostart}"
 
 BIN_DST="$PREFIX/bin/$APP"
-AUTOSTART_DST="$AUTOSTART_DIR/$APP.desktop"
+AUTOSTART_DST="$AUTOSTART_DIR/$APP_ID.desktop"
+LEGACY_AUTOSTART_DST="$AUTOSTART_DIR/$APP.desktop"
 
 die() { echo "install.sh: $*" >&2; exit 1; }
 
@@ -95,13 +97,26 @@ install_autostart() {
 		echo "install.sh: $AUTOSTART_DIR not writable; skipping autostart entry" >&2
 		return 0
 	}
-	{ emit_desktop "$src"; echo "X-GNOME-Autostart-enabled=true"; } >"$AUTOSTART_DST"
+	{
+		emit_desktop "$src" |
+			awk '
+				/^NoDisplay=/ || /^X-GNOME-Autostart-enabled=/ { next }
+				{ print }
+				$0 == "[Desktop Entry]" {
+					print "NoDisplay=true"
+					print "X-GNOME-Autostart-enabled=true"
+				}
+			'
+	} >"$AUTOSTART_DST"
 	chmod 644 "$AUTOSTART_DST"
+	# Remove the old differently named entry on upgrade. Keeping it would
+	# make desktop settings treat the same executable as a second app.
+	[ "$LEGACY_AUTOSTART_DST" = "$AUTOSTART_DST" ] || rm -f "$LEGACY_AUTOSTART_DST"
 	echo "autostart entry -> $AUTOSTART_DST"
 }
 
 remove_autostart() {
-	rm -f "$AUTOSTART_DST"
+	rm -f "$AUTOSTART_DST" "$LEGACY_AUTOSTART_DST"
 }
 
 remove_desktop_shortcuts() {
