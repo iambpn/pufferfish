@@ -21,6 +21,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          token: ${{ secrets.RELEASE_TOKEN }}
 
       - uses: actions/setup-go@v7
         with:
@@ -65,7 +67,7 @@ jobs:
 
       - name: Publish GitHub Release
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           gh release create "${{ steps.meta.outputs.tag }}" release/* \
             --title "${{ steps.meta.outputs.tag }}" \
