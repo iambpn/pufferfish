@@ -56,7 +56,7 @@ func NewHistoryWindow(
 
 			clearAll := func() { clipboard.ClearAll(store, watcher) }
 
-			content, detachListeners := ui.NewHistorySection(store, selectItem, w.Close, clearAll)
+			content, list, detachListeners := ui.NewHistorySection(store, selectItem, w.Close, clearAll)
 
 			w.SetOnClosed(func() {
 				// clean up the listeners and resource on close
@@ -98,6 +98,11 @@ func NewHistoryWindow(
 
 			w.Resize(fyne.NewSize(historyWindowWidth, historyWindowHeight))
 			w.Show()
+			// Put keyboard focus on the newest item immediately. The list starts
+			// highlighted at row zero, so Enter can restore it without requiring
+			// an initial click or arrow-key press.
+			list.Highlight(0)
+			w.Canvas().Focus(list)
 
 			// A splash window centers itself the first time it's shown,
 			// which would override an earlier RequestPosition, so restore

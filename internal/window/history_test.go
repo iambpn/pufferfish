@@ -121,7 +121,7 @@ func TestHistoryWindowEscapeKeyCloses(t *testing.T) {
 	}
 }
 
-func TestHistoryWindowSelectingAnItemRestoresItAndCloses(t *testing.T) {
+func TestHistoryWindowEnterRestoresFocusedFirstItemAndCloses(t *testing.T) {
 	if err := clipboard.Init(); err != nil {
 		t.Skipf("system clipboard unavailable: %v", err)
 	}
@@ -140,10 +140,14 @@ func TestHistoryWindowSelectingAnItemRestoresItAndCloses(t *testing.T) {
 	show()
 
 	win := newestWindow(a)
-	tapFirstCard(t, win.Content())
+	focused := win.Canvas().Focused()
+	if focused == nil {
+		t.Fatal("history window opened without a focused item")
+	}
+	focused.TypedKey(&fyne.KeyEvent{Name: fyne.KeyEnter})
 
 	if got := windowCount(a); got != baseline {
-		t.Fatalf("selecting an item should close the window, got %d windows still open", got)
+		t.Fatalf("pressing Enter should close the window, got %d windows still open", got)
 	}
 }
 

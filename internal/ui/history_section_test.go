@@ -10,7 +10,6 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/test"
 	"fyne.io/fyne/v2/theme"
-	"fyne.io/fyne/v2/widget"
 
 	"github.com/iambpn/pufferfish/internal/clipboard"
 )
@@ -42,7 +41,7 @@ func cards(obj fyne.CanvasObject) []*historyCard {
 func newTestSection(t *testing.T, store *clipboard.Store) (fyne.Window, func()) {
 	t.Helper()
 
-	content, detach := NewHistorySection(store, func(clipboard.Item) {}, func() {}, store.Clear)
+	content, _, detach := NewHistorySection(store, func(clipboard.Item) {}, func() {}, store.Clear)
 	w := test.NewWindow(content)
 	w.Resize(fyne.NewSize(380, 400))
 	return w, detach
@@ -98,7 +97,7 @@ func TestDetachStopsFollowingTheStore(t *testing.T) {
 
 	store := clipboard.NewStore(t.TempDir())
 	t.Cleanup(store.Flush)
-	content, detach := NewHistorySection(store, func(clipboard.Item) {}, func() {}, store.Clear)
+	content, _, detach := NewHistorySection(store, func(clipboard.Item) {}, func() {}, store.Clear)
 	w := test.NewWindow(content)
 	defer w.Close()
 
@@ -137,7 +136,7 @@ func TestTappingACardSelectsIt(t *testing.T) {
 	store.Add(clipboard.NewTextItem("pick me"))
 
 	var picked clipboard.Item
-	content, detach := NewHistorySection(store, func(i clipboard.Item) { picked = i }, func() {}, store.Clear)
+	content, _, detach := NewHistorySection(store, func(i clipboard.Item) { picked = i }, func() {}, store.Clear)
 	defer detach()
 
 	w := test.NewWindow(content)
@@ -152,6 +151,60 @@ func TestTappingACardSelectsIt(t *testing.T) {
 
 	if picked.Text != "pick me" {
 		t.Fatalf("selected %+v", picked)
+	}
+}
+
+func TestFocusedHistoryListEnterSelectsFirstItem(t *testing.T) {
+	test.NewTempApp(t)
+
+	store := clipboard.NewStore(t.TempDir())
+	t.Cleanup(store.Flush)
+	store.Add(clipboard.NewTextItem("older"))
+	store.Add(clipboard.NewTextItem("newest"))
+
+	var picked clipboard.Item
+	content, list, detach := NewHistorySection(store, func(i clipboard.Item) { picked = i }, func() {}, store.Clear)
+	defer detach()
+
+	w := test.NewWindow(content)
+	w.Resize(fyne.NewSize(380, 400))
+	defer w.Close()
+
+	list.Highlight(0)
+	w.Canvas().Focus(list)
+	if w.Canvas().Focused() != list {
+		t.Fatal("history list did not receive keyboard focus")
+	}
+	list.TypedKey(&fyne.KeyEvent{Name: fyne.KeyEnter})
+
+	if picked.Text != "newest" {
+		t.Fatalf("Enter selected %q, want newest item", picked.Text)
+	}
+}
+
+func TestFocusedHistoryListReturnSelectsNavigatedItem(t *testing.T) {
+	test.NewTempApp(t)
+
+	store := clipboard.NewStore(t.TempDir())
+	t.Cleanup(store.Flush)
+	store.Add(clipboard.NewTextItem("older"))
+	store.Add(clipboard.NewTextItem("newest"))
+
+	var picked clipboard.Item
+	content, list, detach := NewHistorySection(store, func(i clipboard.Item) { picked = i }, func() {}, store.Clear)
+	defer detach()
+
+	w := test.NewWindow(content)
+	w.Resize(fyne.NewSize(380, 400))
+	defer w.Close()
+
+	list.Highlight(0)
+	w.Canvas().Focus(list)
+	list.TypedKey(&fyne.KeyEvent{Name: fyne.KeyDown})
+	list.TypedKey(&fyne.KeyEvent{Name: fyne.KeyReturn})
+
+	if picked.Text != "older" {
+		t.Fatalf("Return selected %q, want navigated item", picked.Text)
 	}
 }
 
@@ -253,7 +306,7 @@ func TestClearAllButtonInvokesCallback(t *testing.T) {
 	store.Add(clipboard.NewTextItem("one"))
 
 	var cleared bool
-	content, detach := NewHistorySection(store, func(clipboard.Item) {}, func() {}, func() { cleared = true })
+	content, _, detach := NewHistorySection(store, func(clipboard.Item) {}, func() {}, func() { cleared = true })
 	w := test.NewWindow(content)
 	w.Resize(fyne.NewSize(380, 400))
 	defer w.Close()
@@ -299,14 +352,14 @@ func findSmallButton(obj fyne.CanvasObject) *smallButton {
 }
 
 // findList walks the rendered tree and returns the history list, if any.
-func findList(obj fyne.CanvasObject) *widget.List {
-	var found *widget.List
+func findList(obj fyne.CanvasObject) *historyList {
+	var found *historyList
 	var walk func(fyne.CanvasObject)
 	walk = func(o fyne.CanvasObject) {
 		if found != nil {
 			return
 		}
-		if l, ok := o.(*widget.List); ok {
+		if l, ok := o.(*historyList); ok {
 			found = l
 			return
 		}

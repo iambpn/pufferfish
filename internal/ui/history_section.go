@@ -23,11 +23,11 @@ var dividerColor = color.NRGBA{R: 128, G: 128, B: 128, A: 60}
 // The section follows the store while it is open, so items copied while the
 // flyout is showing appear straight away. The returned detach function
 // unsubscribes it and must be called when the window closes.
-func NewHistorySection(store *clipboard.Store, onSelect func(clipboard.Item), onClose func(), onClearAll func()) (content fyne.CanvasObject, detach func()) {
+func NewHistorySection(store *clipboard.Store, onSelect func(clipboard.Item), onClose func(), onClearAll func()) (content fyne.CanvasObject, list *historyList, detach func()) {
 	placeholder := widget.NewLabel("Clipboard history is empty")
 	placeholder.Alignment = fyne.TextAlignCenter
 
-	list := newHistoryList(store, onSelect)
+	list = newHistoryList(store, onSelect, onClose)
 	listNoShadow := container.NewThemeOverride(list, noScrollShadowTheme{Theme: theme.DefaultTheme()})
 
 	refresh := func() {
@@ -51,7 +51,7 @@ func NewHistorySection(store *clipboard.Store, onSelect func(clipboard.Item), on
 		nil, nil, nil,
 		container.NewStack(listNoShadow, container.NewCenter(placeholder)),
 	)
-	return content, detach
+	return content, list, detach
 }
 
 // newTitleRow builds the "Clipboard" header with a "Clear all" action and a
@@ -78,8 +78,8 @@ func newDividerRow() fyne.CanvasObject {
 // cards, wired to copy an item on tap and delete it via its delete button.
 // Removing an item notifies the store, which refreshes the list through the
 // section's listener.
-func newHistoryList(store *clipboard.Store, onSelect func(clipboard.Item)) *widget.List {
-	list := widget.NewList(
+func newHistoryList(store *clipboard.Store, onSelect func(clipboard.Item), onClose func()) *historyList {
+	base := widget.NewList(
 		func() int { return store.Len() },
 		func() fyne.CanvasObject { return newHistoryCard() },
 		func(id widget.ListItemID, obj fyne.CanvasObject) {
@@ -95,9 +95,52 @@ func newHistoryList(store *clipboard.Store, onSelect func(clipboard.Item)) *widg
 			card.deleteBtn.OnTapped = func() { store.RemoveAt(id) }
 		},
 	)
-	list.HideSeparators = true
+	list := &historyList{list: base, onClose: onClose}
+	list.ExtendBaseWidget(list)
+	base.OnHighlighted = func(id widget.ListItemID) { list.highlighted = id }
+	base.OnSelected = func(id widget.ListItemID) {
+		item, ok := store.ItemAt(id)
+		if ok {
+			onSelect(item)
+		}
+	}
+	base.HideSeparators = true
 	return list
 }
+
+// historyList adds the activation keys expected from a clipboard picker to
+// Fyne's list keyboard navigation. Fyne highlights rows with Up/Down and
+// selects them with Space, but leaves Enter and Escape to the application.
+type historyList struct {
+	widget.BaseWidget
+
+	list        *widget.List
+	highlighted widget.ListItemID
+	onClose     func()
+}
+
+func (l *historyList) CreateRenderer() fyne.WidgetRenderer {
+	return widget.NewSimpleRenderer(l.list)
+}
+
+func (l *historyList) FocusGained() { l.list.FocusGained() }
+
+func (l *historyList) FocusLost() { l.list.FocusLost() }
+
+func (l *historyList) Highlight(id widget.ListItemID) { l.list.Highlight(id) }
+
+func (l *historyList) TypedKey(event *fyne.KeyEvent) {
+	switch event.Name {
+	case fyne.KeyEnter, fyne.KeyReturn:
+		l.list.Select(l.highlighted)
+	case fyne.KeyEscape:
+		l.onClose()
+	default:
+		l.list.TypedKey(event)
+	}
+}
+
+func (l *historyList) TypedRune(r rune) { l.list.TypedRune(r) }
 
 // noScrollShadowTheme hides the drop shadow that Fyne's scroll container
 // draws at the edge where more content can be scrolled into view. The
