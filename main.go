@@ -73,7 +73,9 @@ func main() {
 	apply()
 
 	if clipboardReady && prefs.KeepContent {
-		restoreLastItem(store, watcher)
+		// The write to the system clipboard can wait for other
+		// applications, so it must not delay the start of the UI.
+		go restoreLastItem(store, watcher)
 	}
 
 	showPreferences := window.NewPreferencesWindow(a, prefs)

@@ -2,6 +2,7 @@ package window
 
 import (
 	"testing"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/driver/desktop"
@@ -146,8 +147,11 @@ func TestHistoryWindowEnterRestoresFocusedFirstItemAndCloses(t *testing.T) {
 	}
 	focused.TypedKey(&fyne.KeyEvent{Name: fyne.KeyEnter})
 
-	if got := windowCount(a); got != baseline {
-		t.Fatalf("pressing Enter should close the window, got %d windows still open", got)
+	// The clipboard write runs in the background, and the window closes
+	// when that write is complete.
+	closed := waitFor(func() bool { return windowCount(a) == baseline })
+	if !closed {
+		t.Fatalf("pressing Enter should close the window, got %d windows still open", windowCount(a))
 	}
 }
 
@@ -157,6 +161,7 @@ func TestHistoryWindowSelectingAnOlderItemMovesItToTheFront(t *testing.T) {
 	}
 
 	a := newTestApp(t)
+	baseline := windowCount(a)
 
 	store := clipboard.NewStore(t.TempDir())
 	t.Cleanup(store.Flush)
@@ -173,10 +178,62 @@ func TestHistoryWindowSelectingAnOlderItemMovesItToTheFront(t *testing.T) {
 	// Items() is newest-first, so "older" renders as the second card.
 	tapCardAt(t, win.Content(), 1)
 
-	items := store.Items()
-	if len(items) != 2 || items[0].Text != "older" || items[1].Text != "newest" {
-		t.Fatalf("want [older, newest] after selecting the older item, got %#v", items)
+	// The clipboard write runs in the background, and the history changes
+	// when that write is complete.
+	moved := waitFor(func() bool {
+		items := store.Items()
+		return len(items) == 2 && items[0].Text == "older" && items[1].Text == "newest"
+	})
+	if !moved {
+		t.Fatalf("want [older, newest] after selecting the older item, got %#v", store.Items())
 	}
+
+	// The selection closes the window as its last step. Wait for that, so
+	// the background work of this test does not run during the next test.
+	if !waitFor(func() bool { return windowCount(a) == baseline }) {
+		t.Fatal("the window did not close after the selection")
+	}
+}
+
+func TestHistoryWindowDoesNotBringBackAnItemClearedDuringItsSelection(t *testing.T) {
+	if err := clipboard.Init(); err != nil {
+		t.Skipf("system clipboard unavailable: %v", err)
+	}
+
+	a := newTestApp(t)
+
+	store := clipboard.NewStore(t.TempDir())
+	t.Cleanup(store.Flush)
+	store.Add(clipboard.NewTextItem("pick me"))
+	watcher := clipboard.NewWatcher(store)
+	prefs := preferences.LoadClipboardPreferences(a)
+	prefs.SetAutoPaste(false)
+
+	show := NewHistoryWindow(a, store, watcher, prefs)
+	show()
+	win := newestWindow(a)
+
+	// The clipboard write of the selection runs in the background, so the
+	// history is cleared before that write is complete.
+	tapFirstCard(t, win.Content())
+	store.Clear()
+
+	time.Sleep(300 * time.Millisecond)
+	if items := store.Items(); len(items) != 0 {
+		t.Fatalf("a cleared item must not come back, got %#v", items)
+	}
+}
+
+// waitFor reports whether cond became true before the time limit.
+func waitFor(cond func() bool) bool {
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if cond() {
+			return true
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	return false
 }
 
 // tapFirstCard finds the first tappable, non-hoverable widget in the
