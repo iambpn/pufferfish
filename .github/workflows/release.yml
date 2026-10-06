@@ -17,7 +17,27 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # A manual run creates the tag with RELEASE_TOKEN, and that tag starts a
+  # second run through the push trigger. This job lets the second run skip.
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      found: ${{ steps.existing.outputs.found }}
+    steps:
+      - name: Check for an existing release
+        id: existing
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          fi
+
   release:
+    needs: check
+    if: needs.check.outputs.found != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
