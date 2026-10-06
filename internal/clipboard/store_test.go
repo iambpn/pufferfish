@@ -22,6 +22,24 @@ func pngBytes(t *testing.T, w, h int, c color.Color) []byte {
 	return buf.Bytes()
 }
 
+func TestContainsFindsAnItemByItsContent(t *testing.T) {
+	s := NewStore(t.TempDir())
+	t.Cleanup(s.Flush)
+	s.Add(NewTextItem("kept"))
+
+	if !s.Contains(NewTextItem("kept")) {
+		t.Fatal("want the store to contain an item that was added")
+	}
+	if s.Contains(NewTextItem("never added")) {
+		t.Fatal("the store must not contain an item that was not added")
+	}
+
+	s.Clear()
+	if s.Contains(NewTextItem("kept")) {
+		t.Fatal("the store must not contain an item after Clear")
+	}
+}
+
 func TestAddKeepsNewestFirst(t *testing.T) {
 	s := NewStore(t.TempDir())
 	t.Cleanup(s.Flush)

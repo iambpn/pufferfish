@@ -41,17 +41,50 @@ func NewHistoryWindow(
 			w := a.Driver().(desktop.Driver).CreateSplashWindow()
 			w.SetTitle("Pufferfish History")
 
+			// closed and selecting are used only on the UI goroutine.
+			closed := false
+			selecting := false
+
+			// The write to the system clipboard can wait for other
+			// applications, so it runs in the background and the rest
+			// continues on the UI goroutine. A second selection is ignored
+			// until the first one is complete.
 			selectItem := func(item clipboard.Item) {
-				if err := watcher.Put(item); err != nil {
-					fyne.LogError("could not restore the clipboard item", err)
+				if selecting {
 					return
 				}
-				item.CapturedAt = time.Now()
-				store.Add(item)
-				w.Close()
-				if prefs.AutoPaste {
-					clipboard.Paste()
-				}
+				selecting = true
+
+				go func() {
+					err := watcher.Put(item)
+					fyne.Do(func() {
+						selecting = false
+						if err != nil {
+							fyne.LogError("could not restore the clipboard item", err)
+							return
+						}
+						// The user can remove the item, or clear the
+						// history, while the write runs. A removed item
+						// must not come back.
+						if !store.Contains(item) {
+							return
+						}
+						item.CapturedAt = time.Now()
+						store.Add(item)
+
+						// The window can close while the write runs, for
+						// example when it loses focus. The item stays on the
+						// clipboard, but a paste would then go to a window
+						// that the user did not expect.
+						if closed {
+							return
+						}
+						w.Close()
+						if prefs.AutoPaste {
+							clipboard.Paste()
+						}
+					})
+				}()
 			}
 
 			clearAll := func() { clipboard.ClearAll(store, watcher) }
@@ -59,6 +92,7 @@ func NewHistoryWindow(
 			content, list, detachListeners := ui.NewHistorySection(store, selectItem, w.Close, clearAll)
 
 			w.SetOnClosed(func() {
+				closed = true
 				// clean up the listeners and resource on close
 				detachListeners()
 				onClosed()

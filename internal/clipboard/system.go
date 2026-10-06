@@ -23,44 +23,52 @@ func Init() error {
 	if err := system.Init(); err != nil {
 		return errors.Join(ErrUnavailable, err)
 	}
+	initImageWriter()
 	ready = true
 	return nil
 }
 
-// Put places item back on the system clipboard. The write is registered as
-// Pufferfish's own, so the watcher does not recapture it.
+// Put places item back on the system clipboard. The watch is paused while
+// the item is there, so the watcher does not recapture it.
+//
+// Put can wait for the system clipboard, so do not call it on the UI
+// goroutine.
 func (w *Watcher) Put(item Item) error {
 	if !ready {
 		return ErrUnavailable
 	}
 
-	format := system.FmtText
-	buf := []byte(item.Text)
-
-	if item.Kind == KindImage {
-		path, ok := w.store.ImagePath(item)
-		if !ok {
-			return errors.New("clipboard: image file is missing")
-		}
-		png, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		format, buf = system.FmtImage, png
+	if item.Kind != KindImage {
+		return w.writeText(item.Text)
 	}
 
-	w.expectSelfWrite(hashBytes(buf))
-	_, err := system.Write(context.Background(), format, buf)
-	return err
+	path, ok := w.store.ImagePath(item)
+	if !ok {
+		return errors.New("clipboard: image file is missing")
+	}
+	png, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	return w.ownClipboard(func() (<-chan struct{}, error) {
+		return writeImage(png)
+	})
 }
 
 // Clear empties the system clipboard so a paste after "clear all" doesn't
 // bring back an item that was just removed from the history.
+//
+// Clear can wait for the system clipboard, so do not call it on the UI
+// goroutine.
 func (w *Watcher) Clear() error {
 	if !ready {
 		return ErrUnavailable
 	}
+	return w.writeText("")
+}
 
-	_, err := system.Write(context.Background(), system.FmtText, []byte{})
-	return err
+func (w *Watcher) writeText(text string) error {
+	return w.ownClipboard(func() (<-chan struct{}, error) {
+		return system.Write(context.Background(), system.FmtText, []byte(text))
+	})
 }

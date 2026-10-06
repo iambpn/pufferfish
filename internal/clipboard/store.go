@@ -114,6 +114,19 @@ func (s *Store) ItemAt(i int) (Item, bool) {
 	return s.items[i], true
 }
 
+// Contains reports whether the history holds an item with the content of
+// item.
+func (s *Store) Contains(item Item) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, existing := range s.items {
+		if existing.Hash == item.Hash {
+			return true
+		}
+	}
+	return false
+}
+
 // Newest returns the most recent item, if there is one.
 func (s *Store) Newest() (Item, bool) {
 	s.mu.RLock()
